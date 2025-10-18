@@ -256,34 +256,73 @@
                     <button class="lines-toggle" onclick="toggleLinesSection()" title="Hide/Show Lines Section">−</button>
                 </div>
                 
-                <!-- Subway, Commuter Rail, and Seasonal Rail toggles -->
+                <!-- Service controls with Paths and Live columns -->
                 <div class="category-filters" id="lines-section">
-                    <div class="filter-checkbox">
-                        <input type="checkbox" id="show-subway" checked>
-                        <label for="show-subway">All Subway Lines</label>
-                    </div>
-                    <div class="filter-checkbox">
-                        <input type="checkbox" id="show-commuter" checked>
-                        <label for="show-commuter">All Commuter Rail</label>
-                    </div>
-                    <div class="filter-checkbox">
-                        <input type="checkbox" id="show-seasonal" checked>
-                        <label for="show-seasonal">Seasonal Rail</label>
-                    </div>
-                    <div class="filter-checkbox">
-                        <input type="checkbox" id="show-bus" checked>
-                        <label for="show-bus">All Bus Routes</label>
-                    </div>
-                    <div class="filter-checkbox">
-                        <input type="checkbox" id="show-ferry" checked>
-                        <label for="show-ferry">All Ferry Routes</label>
-                    </div>
-                    <div class="filter-checkbox">
-                        <input type="checkbox" id="show-amtrak" checked>
-                        <label for="show-amtrak">Amtrak Routes</label>
-                    </div>
-                    
-
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 5px; font-size: 12px;">Service</th>
+                                <th style="text-align: center; padding: 5px; font-size: 12px;">Paths</th>
+                                <th style="text-align: center; padding: 5px; font-size: 12px;">Live</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Subway</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-subway-paths" checked>
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-subway-live" checked>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Commuter Rail</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-commuter-paths" checked>
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-commuter-live" checked>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Seasonal Rail</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-seasonal-paths" checked>
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-seasonal-live" checked>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Bus</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-bus-paths">
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-bus-live">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Ferry</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-ferry-paths" checked>
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-ferry-live" checked>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Amtrak</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-amtrak-paths" checked>
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-amtrak-live" checked>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -389,7 +428,8 @@
 
         
         // Add event listeners for category filters
-        document.getElementById('show-subway').addEventListener('change', function() {
+        // Subway paths filter
+        document.getElementById('show-subway-paths').addEventListener('change', function() {
             const isChecked = this.checked;
             subwayLines.forEach(lineName => {
                 if (mbtaStopsData[lineName] && layers[lineName]) {
@@ -400,7 +440,14 @@
                     }
                 }
             });
-            // Hide/show train markers for subway lines
+            updateStats();
+        });
+        
+        // Subway live tracking filter
+        document.getElementById('show-subway-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // Hide/show train markers for subway lines ONLY
             trainMarkers.forEach((marker, trainId) => {
                 if (marker && marker.routeName) {
                     if (subwayLines.includes(marker.routeName)) {
@@ -420,14 +467,24 @@
                     startLiveTracking();
                 }
             } else {
-                // Stop live tracking for subway specifically
-                stopLiveTrackingForCategory('subway');
+                // Check if any other services are still active for live tracking
+                const hasCommuter = document.getElementById('show-commuter-live').checked;
+                const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+                const hasBus = document.getElementById('show-bus-live').checked;
+                const hasFerry = document.getElementById('show-ferry-live').checked;
+                const hasAmtrak = document.getElementById('show-amtrak-live').checked;
+                
+                // If no categories are checked, stop live tracking
+                if (!hasCommuter && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
+                    stopLiveTracking();
+                }
             }
             
             updateStats();
         });
         
-        document.getElementById('show-commuter').addEventListener('change', function() {
+        // Commuter rail paths filter
+        document.getElementById('show-commuter-paths').addEventListener('change', function() {
             const isChecked = this.checked;
             commuterLines.forEach(lineName => {
                 if (mbtaStopsData[lineName] && layers[lineName]) {
@@ -438,7 +495,14 @@
                     }
                 }
             });
-            // Hide/show train markers for commuter rail lines
+            updateStats();
+        });
+        
+        // Commuter rail live tracking filter
+        document.getElementById('show-commuter-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // Hide/show train markers for commuter rail lines ONLY
             trainMarkers.forEach((marker, trainId) => {
                 if (marker && marker.routeName) {
                     if (commuterLines.includes(marker.routeName)) {
@@ -458,14 +522,24 @@
                     startLiveTracking();
                 }
             } else {
-                // Stop live tracking for commuter rail specifically
-                stopLiveTrackingForCategory('commuter');
+                // Check if any other services are still active for live tracking
+                const hasSubway = document.getElementById('show-subway-live').checked;
+                const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+                const hasBus = document.getElementById('show-bus-live').checked;
+                const hasFerry = document.getElementById('show-ferry-live').checked;
+                const hasAmtrak = document.getElementById('show-amtrak-live').checked;
+                
+                // If no categories are checked, stop live tracking
+                if (!hasSubway && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
+                    stopLiveTracking();
+                }
             }
             
             updateStats();
         });
         
-        document.getElementById('show-seasonal').addEventListener('change', function() {
+        // Seasonal rail paths filter
+        document.getElementById('show-seasonal-paths').addEventListener('change', function() {
             const isChecked = this.checked;
             seasonalLines.forEach(lineName => {
                 if (mbtaStopsData[lineName] && layers[lineName]) {
@@ -476,7 +550,14 @@
                     }
                 }
             });
-            // Hide/show train markers for seasonal rail lines
+            updateStats();
+        });
+        
+        // Seasonal rail live tracking filter
+        document.getElementById('show-seasonal-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // Hide/show train markers for seasonal rail lines ONLY
             trainMarkers.forEach((marker, trainId) => {
                 if (marker && marker.routeName) {
                     if (seasonalLines.includes(marker.routeName)) {
@@ -496,14 +577,24 @@
                     startLiveTracking();
                 }
             } else {
-                // Stop live tracking for seasonal rail specifically
-                stopLiveTrackingForCategory('seasonal');
+                // Check if any other services are still active for live tracking
+                const hasSubway = document.getElementById('show-subway-live').checked;
+                const hasCommuter = document.getElementById('show-commuter-live').checked;
+                const hasBus = document.getElementById('show-bus-live').checked;
+                const hasFerry = document.getElementById('show-ferry-live').checked;
+                const hasAmtrak = document.getElementById('show-amtrak-live').checked;
+                
+                // If no categories are checked, stop live tracking
+                if (!hasSubway && !hasCommuter && !hasBus && !hasFerry && !hasAmtrak) {
+                    stopLiveTracking();
+                }
             }
             
             updateStats();
         });
         
-        document.getElementById('show-bus').addEventListener('change', function() {
+        // Bus paths filter
+        document.getElementById('show-bus-paths').addEventListener('change', function() {
             const isChecked = this.checked;
             // Use all available bus routes from mbtaBusData instead of just busLines
             if (mbtaBusData && typeof mbtaBusData === 'object') {
@@ -517,6 +608,13 @@
                     }
                 });
             }
+            updateStats();
+        });
+        
+        // Bus live tracking filter
+        document.getElementById('show-bus-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
             // Hide/show bus markers
             busMarkers.forEach((marker, busId) => {
                 if (marker) {
@@ -535,19 +633,15 @@
                     startLiveTracking();
                 }
             } else {
-                // Stop bus tracking specifically
-                stopLiveTrackingForCategory('bus');
-                
-                // Check if any other categories are checked
-                const hasSubway = document.getElementById('show-subway').checked;
-                const hasCommuter = document.getElementById('show-commuter').checked;
-                const hasSeasonal = document.getElementById('show-seasonal').checked;
-                const hasBus = document.getElementById('show-bus').checked;
-                const hasFerry = document.getElementById('show-ferry').checked;
-                const hasAmtrak = document.getElementById('show-amtrak').checked;
+                // Check if any other services are still active for live tracking
+                const hasSubway = document.getElementById('show-subway-live').checked;
+                const hasCommuter = document.getElementById('show-commuter-live').checked;
+                const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+                const hasFerry = document.getElementById('show-ferry-live').checked;
+                const hasAmtrak = document.getElementById('show-amtrak-live').checked;
                 
                 // If no categories are checked, stop live tracking
-                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
+                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasFerry && !hasAmtrak) {
                     stopLiveTracking();
                 }
             }
@@ -555,7 +649,8 @@
             updateStats();
         });
         
-        document.getElementById('show-ferry').addEventListener('change', function() {
+        // Ferry paths filter
+        document.getElementById('show-ferry-paths').addEventListener('change', function() {
             const isChecked = this.checked;
             ferryLines.forEach(lineName => {
                 if (mbtaFerryData[lineName] && layers[lineName]) {
@@ -563,6 +658,23 @@
                         map.addLayer(layers[lineName]);
                     } else {
                         map.removeLayer(layers[lineName]);
+                    }
+                }
+            });
+            updateStats();
+        });
+        
+        // Ferry live tracking filter
+        document.getElementById('show-ferry-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // Hide/show ferry markers
+            ferryMarkers.forEach((marker, ferryId) => {
+                if (marker) {
+                    if (isChecked) {
+                        marker.addTo(map);
+                    } else {
+                        marker.remove();
                     }
                 }
             });
@@ -574,16 +686,15 @@
                     startLiveTracking();
                 }
             } else {
-                // Check if any other categories are checked
-                const hasSubway = document.getElementById('show-subway').checked;
-                const hasCommuter = document.getElementById('show-commuter').checked;
-                const hasSeasonal = document.getElementById('show-seasonal').checked;
-                const hasBus = document.getElementById('show-bus').checked;
-                const hasFerry = document.getElementById('show-ferry').checked;
-                const hasAmtrak = document.getElementById('show-amtrak').checked;
+                // Check if any other services are still active for live tracking
+                const hasSubway = document.getElementById('show-subway-live').checked;
+                const hasCommuter = document.getElementById('show-commuter-live').checked;
+                const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+                const hasBus = document.getElementById('show-bus-live').checked;
+                const hasAmtrak = document.getElementById('show-amtrak-live').checked;
                 
                 // If no categories are checked, stop live tracking
-                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
+                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasAmtrak) {
                     stopLiveTracking();
                 }
             }
@@ -591,8 +702,8 @@
             updateStats();
         });
         
-        // Add event listener for Amtrak filter
-        document.getElementById('show-amtrak').addEventListener('change', function() {
+        // Amtrak paths filter
+        document.getElementById('show-amtrak-paths').addEventListener('change', function() {
             const isChecked = this.checked;
             
             if (isChecked) {
@@ -617,18 +728,6 @@
                         if (marker) marker.addTo(map);
                     });
                 }
-                
-                // Show existing Amtrak train markers
-                if (amtrakMarkers) {
-                    amtrakMarkers.forEach(marker => {
-                        if (marker) marker.addTo(map);
-                    });
-                }
-                
-                // Resume live tracking if it was stopped
-                if (!trackingInterval) {
-                    startLiveTracking();
-                }
             } else {
                 // Hide Amtrak routes
                 if (window.amtrakRouteLayers) {
@@ -643,24 +742,44 @@
                         if (marker) marker.remove();
                     });
                 }
-                
-                // Hide existing Amtrak train markers
-                if (amtrakMarkers) {
-                    amtrakMarkers.forEach(marker => {
-                        if (marker) marker.remove();
-                    });
+            }
+            
+            updateStats();
+        });
+        
+        // Amtrak live tracking filter
+        document.getElementById('show-amtrak-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // Hide/show existing Amtrak train markers
+            if (amtrakMarkers) {
+                amtrakMarkers.forEach(marker => {
+                    if (marker) {
+                        if (isChecked) {
+                            marker.addTo(map);
+                        } else {
+                            marker.remove();
+                        }
+                    }
+                });
+            }
+            
+            // Control live tracking for Amtrak
+            if (isChecked) {
+                // Resume live tracking if it was stopped
+                if (!trackingInterval) {
+                    startLiveTracking();
                 }
-                
-                // Check if any other categories are checked
-                const hasSubway = document.getElementById('show-subway').checked;
-                const hasCommuter = document.getElementById('show-commuter').checked;
-                const hasSeasonal = document.getElementById('show-seasonal').checked;
-                const hasBus = document.getElementById('show-bus').checked;
-                const hasFerry = document.getElementById('show-ferry').checked;
-                const hasAmtrak = document.getElementById('show-amtrak').checked;
+            } else {
+                // Check if any other services are still active for live tracking
+                const hasSubway = document.getElementById('show-subway-live').checked;
+                const hasCommuter = document.getElementById('show-commuter-live').checked;
+                const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+                const hasBus = document.getElementById('show-bus-live').checked;
+                const hasFerry = document.getElementById('show-ferry-live').checked;
                 
                 // If no categories are checked, stop live tracking
-                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
+                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasFerry) {
                     stopLiveTracking();
                 }
             }
@@ -913,9 +1032,10 @@
                         layers[lineName].addLayer(track);
                     });
                     
-                    // Add the layer to the map
-                    
-                    layers[lineName].addTo(map);
+                    // Add the layer to the map only if bus paths checkbox is checked
+                    if (document.getElementById('show-bus-paths').checked) {
+                        layers[lineName].addTo(map);
+                    }
                 });
             }
             
@@ -1343,8 +1463,8 @@
                     // Store route name with marker for filtering
                     trainMarker.routeName = routeName;
 
-                    // Add to map and store reference (only if Amtrak is checked)
-                    if (document.getElementById('show-amtrak').checked) {
+                    // Add to map and store reference (only if Amtrak live tracking is checked)
+                    if (document.getElementById('show-amtrak-live').checked) {
                         trainMarker.addTo(map);
                     }
                     amtrakMarkers.set(trainId, trainMarker);
@@ -1430,8 +1550,8 @@
                     // Store marker
                     window.amtrakStationMarkers.set(station.stationId, stationMarker);
                     
-                    // Add to map if Amtrak is shown
-                    if (document.getElementById('show-amtrak').checked) {
+                    // Add to map if Amtrak paths are shown
+                    if (document.getElementById('show-amtrak-paths').checked) {
                         stationMarker.addTo(map);
                     }
                 }
@@ -1580,72 +1700,35 @@
             }
         }
         
-        // Function to load Amtrak routes from API (fallback)
+        // Function to load Amtrak routes from USDOT NTAD ArcGIS service
         async function loadAmtrakRoutesFromAPI() {
             try {
                 // ArcGIS Feature Server URL for Amtrak routes
                 const baseUrl = 'https://services.arcgis.com/xOi1kZaI0eWDREZv/ArcGIS/rest/services/NTAD_Amtrak_Routes/FeatureServer/0/query';
                 
-                // Try different query approaches to get all routes
-                let routesGeojson = null;
-                let attempt = 1;
+                const params = new URLSearchParams({
+                    where: '1=1',
+                    outFields: '*',
+                    outSR: 4326,
+                    f: 'geojson',
+                    returnGeometry: 'true'
+                });
                 
-                while (attempt <= 3 && (!routesGeojson || !routesGeojson.features || routesGeojson.features.length === 0)) {
-                    let params;
-                    if (attempt === 1) {
-                        // First attempt: standard query
-                        params = new URLSearchParams({
-                            where: '1=1',
-                            outFields: '*',
-                            outSR: 4326,
-                            f: 'geojson',
-                            returnGeometry: 'true'
-                        });
-                    } else if (attempt === 2) {
-                        // Second attempt: try with different where clause
-                        params = new URLSearchParams({
-                            where: "ROUTE_NAME IS NOT NULL OR NAME IS NOT NULL OR ROUTE IS NOT NULL",
-                            outFields: '*',
-                            outSR: 4326,
-                            f: 'geojson',
-                            returnGeometry: 'true'
-                        });
-                    } else {
-                        // Third attempt: try to get specific routes by name
-                        params = new URLSearchParams({
-                            where: "ROUTE_NAME LIKE '%Downeaster%' OR ROUTE_NAME LIKE '%Northeast%' OR ROUTE_NAME LIKE '%Acela%' OR ROUTE_NAME LIKE '%Vermonter%'",
-                            outFields: '*',
-                            outSR: 4326,
-                            f: 'geojson',
-                            returnGeometry: 'true'
-                        });
+                const response = await fetch(`${baseUrl}?${params.toString()}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
                     }
-                    
-                    const response = await fetch(`${baseUrl}?${params.toString()}`, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    routesGeojson = await response.json();
-                    
-                    if (routesGeojson.features && routesGeojson.features.length > 0) {
-                        break; // Success, exit the loop
-                    }
-                    
-                    attempt++;
-                    if (attempt <= 3) {
-                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between attempts
-                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
+                const routesGeojson = await response.json();
+                
                 if (!routesGeojson.features || routesGeojson.features.length === 0) {
-                    throw new Error('No Amtrak routes found after all attempts');
+                    throw new Error('No Amtrak routes found');
                 }
                 
                 // Create route layers and add to map
@@ -1653,8 +1736,8 @@
                 window.amtrakRoutesLoaded = true;
                 
             } catch (error) {
-                console.error('Error loading Amtrak routes from API:', error);
-                loadHardcodedAmtrakRoutes();
+                console.error('Error loading Amtrak routes from USDOT NTAD:', error);
+                // No fallback - just log the error
             }
         }
         
@@ -1708,157 +1791,6 @@
                     polyline.addTo(window.amtrakRouteLayerGroup);
                 }
             });
-        }
-        
-        // Alternative function to load Amtrak routes from OpenStreetMap
-        async function loadAmtrakRoutesFromOSM() {
-            try {
-
-                
-                // Overpass API query for Amtrak routes
-                const overpassQuery = `
-                    [out:json][timeout:60];
-                    (
-                        relation["operator"="Amtrak"];
-                        way["operator"="Amtrak"];
-                        relation["name"~"Amtrak"];
-                        way["name"~"Amtrak"];
-                        relation["route"="train"]["operator"="Amtrak"];
-                        way["route"="train"]["operator"="Amtrak"];
-                    );
-                    out body;
-                    >;
-                    out skel qt;
-                `;
-                
-                const overpassUrl = 'https://overpass-api.de/api/interpreter';
-                
-                const response = await fetch(overpassUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: `data=${encodeURIComponent(overpassQuery)}`
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const osmData = await response.json();
-                
-                // Convert OSM data to GeoJSON-like format
-                const features = [];
-                
-                if (osmData.elements) {
-                    osmData.elements.forEach(element => {
-                        if (element.type === 'way' && element.geometry) {
-                            const feature = {
-                                type: 'Feature',
-                                properties: {
-                                    ROUTE_NAME: element.tags.name || element.tags.ref || 'Amtrak Route',
-                                    NAME: element.tags.name || element.tags.ref || 'Amtrak Route',
-                                    ROUTE: element.tags.ref || element.tags.name || 'Amtrak Route'
-                                },
-                                geometry: {
-                                    type: 'LineString',
-                                    coordinates: element.geometry.map(coord => [coord.lon, coord.lat])
-                                }
-                            };
-                            features.push(feature);
-                        }
-                    });
-                }
-                
-                if (features.length > 0) {
-                    createAmtrakRouteLayers(features);
-                    window.amtrakRoutesLoaded = true;
-                } else {
-                    throw new Error('No Amtrak routes found in OSM data');
-                }
-                
-            } catch (error) {
-                console.error('Error loading Amtrak routes from OSM:', error);
-                console.log('Falling back to hardcoded routes...');
-                loadHardcodedAmtrakRoutes();
-            }
-        }
-        
-        // Final fallback: Load hardcoded Amtrak routes for major lines
-        function loadHardcodedAmtrakRoutes() {
-            
-            const hardcodedRoutes = [
-                {
-                    name: 'Downeaster',
-                    coordinates: [
-                        [42.3601, -71.0589], // Boston
-                        [42.3584, -71.0598], // Boston South Station
-                        [42.3654, -71.1040], // Boston North Station
-                        [42.3736, -71.1097], // Somerville
-                        [42.4084, -71.1198], // Medford
-                        [42.4668, -71.1594], // Wilmington
-                        [42.7126, -71.1626], // Haverhill
-                        [42.9789, -71.1258], // Exeter
-                        [43.0731, -71.0761], // Durham
-                        [43.1935, -70.8743], // Wells
-                        [43.6615, -70.2553]  // Portland
-                    ]
-                },
-                {
-                    name: 'Northeast Corridor',
-                    coordinates: [
-                        [42.3601, -71.0589], // Boston
-                        [42.3584, -71.0598], // Boston South Station
-                        [42.3654, -71.1040], // Boston North Station
-                        [42.3736, -71.1097], // Somerville
-                        [42.4084, -71.1198], // Medford
-                        [42.4668, -71.1594], // Wilmington
-                        [42.7126, -71.1626], // Haverhill
-                        [42.9789, -71.1258], // Exeter
-                        [43.0731, -71.0761], // Durham
-                        [43.1935, -70.8743], // Wells
-                        [43.6615, -70.2553], // Portland
-                        [40.7128, -74.0060], // New York
-                        [39.9526, -75.1652], // Philadelphia
-                        [38.9072, -77.0369]  // Washington DC
-                    ]
-                },
-                {
-                    name: 'Acela Express',
-                    coordinates: [
-                        [42.3601, -71.0589], // Boston
-                        [42.3584, -71.0598], // Boston South Station
-                        [42.3654, -71.1040], // Boston North Station
-                        [42.3736, -71.1097], // Somerville
-                        [42.4084, -71.1198], // Medford
-                        [42.4668, -71.1594], // Wilmington
-                        [42.7126, -71.1626], // Haverhill
-                        [42.9789, -71.1258], // Exeter
-                        [43.0731, -71.0761], // Durham
-                        [43.1935, -70.8743], // Wells
-                        [43.6615, -70.2553], // Portland
-                        [40.7128, -74.0060], // New York
-                        [39.9526, -75.1652], // Philadelphia
-                        [38.9072, -77.0369]  // Washington DC
-                    ]
-                }
-            ];
-            
-            const features = hardcodedRoutes.map(route => ({
-                type: 'Feature',
-                properties: {
-                    ROUTE_NAME: route.name,
-                    NAME: route.name,
-                    ROUTE: route.name
-                },
-                geometry: {
-                    type: 'LineString',
-                    coordinates: route.coordinates.map(coord => [coord[1], coord[0]]) // Convert to [lon, lat]
-                }
-            }));
-            
-            createAmtrakRouteLayers(features);
-            window.amtrakRoutesLoaded = true;
         }
         
         // Function to create Amtrak route layers from GeoJSON features
@@ -1948,8 +1880,8 @@
                         const layerKey = `amtrak_${index}`;
                         window.amtrakRouteLayers[layerKey] = routeLine;
                         
-                        // Add to map if Amtrak is currently shown
-                        if (document.getElementById('show-amtrak').checked) {
+                        // Add to map if Amtrak paths are currently shown
+                        if (document.getElementById('show-amtrak-paths').checked) {
                             routeLine.addTo(map);
                         }
                         
@@ -2051,12 +1983,25 @@
                             
                             // If no match found, try partial matching for commuter rail
                             if (routeName === 'Unknown Route' && routeId.startsWith('CR-')) {
+                                // First try to match against mbtaStopsData
                                 Object.keys(mbtaStopsData).forEach(name => {
                                     if (name.includes('Line') && routeId.includes(name.split(' ')[0])) {
                                         routeName = name;
                                         color = lineColors[name] || '#800080'; // Default purple for commuter rail
                                     }
                                 });
+                                
+                                // If still no match, try to match against commuterLines array
+                                if (routeName === 'Unknown Route') {
+                                    const routeSuffix = routeId.substring(3); // Remove "CR-" prefix
+                                    commuterLines.forEach(lineName => {
+                                        if (lineName.toLowerCase().includes(routeSuffix.toLowerCase()) || 
+                                            routeSuffix.toLowerCase().includes(lineName.split(' ')[0].toLowerCase())) {
+                                            routeName = lineName;
+                                            color = lineColors[lineName] || '#800080'; // Default purple for commuter rail
+                                        }
+                                    });
+                                }
                             }
                             
                             // If still no match, try to identify Green Line routes specifically
@@ -2226,12 +2171,12 @@
                     // Add to map and store reference (only if the category is checked)
                     let shouldShow = false;
                     
-                    // Check if this train should be shown based on checkbox states
-                    if (routeName.includes('Line') && document.getElementById('show-subway').checked) {
+                    // Check if this train should be shown based on live tracking checkbox states
+                    if (routeName.includes('Line') && document.getElementById('show-subway-live').checked) {
                         shouldShow = true;
-                    } else if (commuterLines.includes(routeName) && document.getElementById('show-commuter').checked) {
+                    } else if (commuterLines.includes(routeName) && document.getElementById('show-commuter-live').checked) {
                         shouldShow = true;
-                    } else if (seasonalLines.includes(routeName) && document.getElementById('show-seasonal').checked) {
+                    } else if (seasonalLines.includes(routeName) && document.getElementById('show-seasonal-live').checked) {
                         shouldShow = true;
                     }
                     
@@ -2343,8 +2288,8 @@
                     // Store route name with marker for filtering
                     busMarker.routeName = routeName;
                     
-                    // Add to map and store reference (only if bus checkbox is checked)
-                    if (document.getElementById('show-bus').checked) {
+                    // Add to map and store reference (only if bus live tracking checkbox is checked)
+                    if (document.getElementById('show-bus-live').checked) {
                         busMarker.addTo(map);
                     }
                     
@@ -2506,13 +2451,13 @@
                 });
             }
             
-            // Check if any categories are still checked
-            const hasSubway = document.getElementById('show-subway').checked;
-            const hasCommuter = document.getElementById('show-commuter').checked;
-            const hasSeasonal = document.getElementById('show-seasonal').checked;
-            const hasBus = document.getElementById('show-bus').checked;
-            const hasFerry = document.getElementById('show-ferry').checked;
-            const hasAmtrak = document.getElementById('show-amtrak').checked;
+            // Check if any categories are still checked for live tracking
+            const hasSubway = document.getElementById('show-subway-live').checked;
+            const hasCommuter = document.getElementById('show-commuter-live').checked;
+            const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+            const hasBus = document.getElementById('show-bus-live').checked;
+            const hasFerry = document.getElementById('show-ferry-live').checked;
+            const hasAmtrak = document.getElementById('show-amtrak-live').checked;
             
             // If no categories are checked, stop all live tracking
             if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
@@ -2566,19 +2511,35 @@
         
 
         
-        // Initially show all layers since all checkboxes are checked by default
+        // Initially show layers based on checkbox states
         if (mbtaStopsData && typeof mbtaStopsData === 'object') {
             Object.keys(mbtaStopsData).forEach(lineName => {
                 if (layers[lineName]) {
-                    map.addLayer(layers[lineName]);
+                    // Check if this line should be shown based on checkbox states
+                    let shouldShow = false;
+                    
+                    if (lineName.includes('Line') && document.getElementById('show-subway-paths').checked) {
+                        shouldShow = true;
+                    } else if (commuterLines.includes(lineName) && document.getElementById('show-commuter-paths').checked) {
+                        shouldShow = true;
+                    } else if (seasonalLines.includes(lineName) && document.getElementById('show-seasonal-paths').checked) {
+                        shouldShow = true;
+                    }
+                    
+                    if (shouldShow) {
+                        map.addLayer(layers[lineName]);
+                    }
                 }
             });
         }
         
+        // Don't show bus layers by default since checkbox is unchecked
+        // Bus layers will be shown when checkbox is checked
         if (mbtaBusData && typeof mbtaBusData === 'object') {
+            // Store bus layers but don't add them to map yet
             Object.keys(mbtaBusData).forEach(lineName => {
                 if (layers[lineName]) {
-                    map.addLayer(layers[lineName]);
+                    // Don't add to map - wait for checkbox to be checked
                 }
             });
         }
@@ -2586,16 +2547,20 @@
         if (mbtaFerryData && typeof mbtaFerryData === 'object') {
             Object.keys(mbtaFerryData).forEach(lineName => {
                 if (layers[lineName]) {
-                    map.addLayer(layers[lineName]);
+                    if (document.getElementById('show-ferry-paths').checked) {
+                        map.addLayer(layers[lineName]);
+                    }
                 }
             });
         }
         
-        // Load Amtrak data since checkbox is checked by default
-        setTimeout(() => {
-            loadAmtrakRoutes();
-            loadAmtrakStations();
-        }, 1000);
+        // Load Amtrak data if checkbox is checked by default
+        if (document.getElementById('show-amtrak-paths').checked) {
+            setTimeout(() => {
+                loadAmtrakRoutes();
+                loadAmtrakStations();
+            }, 1000);
+        }
         
         // Start tracking after a short delay to let the map load
         setTimeout(() => {

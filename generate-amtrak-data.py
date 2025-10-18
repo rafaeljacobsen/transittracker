@@ -44,7 +44,7 @@ class AmtrakDataGenerator:
             "where": "1=1",
             "outFields": "*",
             "outSR": 4326,
-            "f": "geojson",
+            "f": "b n",
             "returnGeometry": "true"
         }
         
@@ -195,7 +195,7 @@ class AmtrakDataGenerator:
             
             routes_output = {
                 'timestamp': timestamp,
-                'source': 'USDOT NTAD + Amtraker V3 API',
+                'source': 'USDOT NTAD ArcGIS Service',
                 'totalRoutes': len(processed_routes),
                 'routes': processed_routes
             }
