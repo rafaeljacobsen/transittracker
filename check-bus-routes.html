@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bus Route Shape Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #333; }
+        .summary {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .route-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .route-item {
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .has-shapes {
+            background: #c8e6c9;
+            border: 2px solid #4caf50;
+        }
+        .no-shapes {
+            background: #ffcdd2;
+            border: 2px solid #f44336;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #2196f3;
+            color: white;
+        }
+        .missing { color: #f44336; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MBTA Bus Route Shape Analysis</h1>
+        <div id="summary" class="summary"></div>
+        <div id="results"></div>
+    </div>
+
+    <script src="mbta-bus-data.js"></script>
+    <script>
+        // Analyze bus routes and shapes
+        const busRoutes = Object.keys(mbtaBusData || {});
+        const shapesAvailable = Object.keys(busRouteShapes || {});
+        
+        // Find routes without shapes
+        const routesWithShapes = busRoutes.filter(route => shapesAvailable.includes(route));
+        const routesWithoutShapes = busRoutes.filter(route => !shapesAvailable.includes(route));
+        
+        // Check if route 73 exists
+        const route73Exists = busRoutes.includes('73');
+        const route73HasShapes = shapesAvailable.includes('73');
+        
+        // Display summary
+        const summaryDiv = document.getElementById('summary');
+        summaryDiv.innerHTML = `
+            <h2>Summary</h2>
+            <p><strong>Total bus routes in mbtaBusData:</strong> ${busRoutes.length}</p>
+            <p><strong>Routes with shapes:</strong> ${routesWithShapes.length}</p>
+            <p><strong>Routes without shapes:</strong> ${routesWithoutShapes.length}</p>
+            <p class="${route73Exists ? '' : 'missing'}"><strong>Route 73 exists in data:</strong> ${route73Exists ? 'YES' : 'NO'}</p>
+            ${route73Exists ? `<p class="${route73HasShapes ? '' : 'missing'}"><strong>Route 73 has shapes:</strong> ${route73HasShapes ? 'YES' : 'NO'}</p>` : ''}
+        `;
+        
+        // Display detailed results
+        const resultsDiv = document.getElementById('results');
+        
+        let html = '<h2>Routes with Shapes</h2><div class="route-list">';
+        routesWithShapes.sort((a, b) => {
+            const aNum = parseInt(a) || 9999;
+            const bNum = parseInt(b) || 9999;
+            return aNum - bNum;
+        }).forEach(route => {
+            html += `<div class="route-item has-shapes">${route}</div>`;
+        });
+        html += '</div>';
+        
+        html += '<h2>Routes WITHOUT Shapes</h2><div class="route-list">';
+        routesWithoutShapes.sort((a, b) => {
+            const aNum = parseInt(a) || 9999;
+            const bNum = parseInt(b) || 9999;
+            return aNum - bNum;
+        }).forEach(route => {
+            html += `<div class="route-item no-shapes">${route}</div>`;
+        });
+        html += '</div>';
+        
+        // Table view
+        html += '<h2>All Routes (Table View)</h2>';
+        html += '<table><thead><tr><th>Route</th><th>Stops Count</th><th>Has Shapes</th><th>Shape Count</th></tr></thead><tbody>';
+        
+        busRoutes.sort((a, b) => {
+            const aNum = parseInt(a) || 9999;
+            const bNum = parseInt(b) || 9999;
+            return aNum - bNum;
+        }).forEach(route => {
+            const hasShapes = shapesAvailable.includes(route);
+            const stopCount = (mbtaBusData[route] || []).length;
+            const shapeCount = hasShapes ? (busRouteShapes[route] || []).length : 0;
+            const className = route === '73' ? 'missing' : '';
+            html += `<tr class="${className}">
+                <td><strong>${route}</strong></td>
+                <td>${stopCount}</td>
+                <td>${hasShapes ? '✓' : '✗'}</td>
+                <td>${shapeCount}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        resultsDiv.innerHTML = html;
+        
+        // Console log for debugging
+        console.log('Bus Routes Analysis:');
+        console.log('Total routes:', busRoutes.length);
+        console.log('Routes with shapes:', routesWithShapes.length);
+        console.log('Routes without shapes:', routesWithoutShapes.length);
+        console.log('Routes without shapes:', routesWithoutShapes);
+        console.log('Route 73 exists:', route73Exists);
+        console.log('Route 73 has shapes:', route73HasShapes);
+    </script>
+</body>
+</html>
+

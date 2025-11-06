@@ -80,8 +80,17 @@ with open("mbta_gtfs/stops.txt", "r", encoding="utf-8") as f:
 
 print(f"Loaded {len(stops)} stops with coordinates")
 
-# Step 4: Get stops for each route
-print("Step 4: Processing stop times...")
+# Step 4: Build trip-to-route mapping for efficient lookup
+print("Step 4: Building trip-to-route mapping...")
+trip_to_route = {}
+for route_id, trips in route_trips.items():
+    for trip_id in trips:
+        trip_to_route[trip_id] = route_id
+
+print(f"Mapped {len(trip_to_route)} trips to routes")
+
+# Step 5: Get stops for each route
+print("Step 5: Processing stop times...")
 route_stops = defaultdict(dict)
 
 # Count total lines for progress bar
@@ -100,13 +109,12 @@ with open("mbta_gtfs/stop_times.txt", "r", encoding="utf-8") as f:
             stop_id = fields[3]
             
             # Find which route this trip belongs to
-            for route_id in target_routes.keys():
-                if trip_id in route_trips[route_id]:
-                    route_stops[route_id][stop_id] = True
-                    break
+            if trip_id in trip_to_route:
+                route_id = trip_to_route[trip_id]
+                route_stops[route_id][stop_id] = True
 
-# Step 5: Load shapes efficiently
-print("Step 5: Loading shapes...")
+# Step 6: Load shapes efficiently
+print("Step 6: Loading shapes...")
 shapes = defaultdict(list)
 
 # Only load shapes we actually need
@@ -145,8 +153,8 @@ if needed_shapes:
 shape_count = sum(len(points) for points in shapes.values())
 print(f"Loaded {shape_count} shape points for {len(needed_shapes)} shapes")
 
-# Step 6: Build final data structure
-print("Step 6: Building final data structure...")
+# Step 7: Build final data structure
+print("Step 7: Building final data structure...")
 final_data = {}
 stop_to_routes = defaultdict(list)
 
@@ -173,8 +181,8 @@ for route_id, route_stop_dict in route_stops.items():
     if route_stops_list:
         final_data[route_name] = route_stops_list
 
-# Step 7: Generate JavaScript
-print("Step 7: Generating JavaScript...")
+# Step 8: Generate JavaScript
+print("Step 8: Generating JavaScript...")
 js_content = "// MBTA Stops Data - Extracted from GTFS Static Data with Shapes\n"
 js_content += "const mbtaStopsData = {\n"
 
