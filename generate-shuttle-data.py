@@ -36,18 +36,40 @@ def load_gtfs_data():
         shapes_df = pd.read_csv(shapes_file)
         print(f"Loaded {len(shapes_df)} shape points from GTFS")
         
-        # Normalize shape_id column
+        # Normalize shape_id column (remove leading zeros)
         def normalize_shape_id(val):
             try:
-                if isinstance(val, float) and not pd.isna(val):
+                if pd.isna(val):
+                    return str(val)
+                if isinstance(val, float):
                     return str(int(val))
-                return str(val)
+                s = str(val)
+                try:
+                    return str(int(s))
+                except:
+                    return s
             except:
                 return str(val)
         
-        print("Normalizing shape IDs...")
         shapes_df['shape_id'] = shapes_df['shape_id'].apply(normalize_shape_id)
-        print("Shape IDs normalized")
+    
+    # Normalize shape_id in trips.txt to match
+    if 'shape_id' in trips_df.columns:
+        def normalize_shape_id(val):
+            try:
+                if pd.isna(val):
+                    return val
+                if isinstance(val, float):
+                    return str(int(val))
+                s = str(val)
+                try:
+                    return str(int(s))
+                except:
+                    return s
+            except:
+                return str(val)
+        
+        trips_df['shape_id'] = trips_df['shape_id'].apply(normalize_shape_id)
     
     return routes_df, stops_df, stop_times_df, trips_df, shapes_df
 
@@ -112,9 +134,11 @@ def generate_shuttle_data():
     
     all_routes = get_shuttle_routes(routes_df)
     
-    # Build route-trips mapping
+    # Build route-trips mapping with reverse lookup
     print("Building route-trips mapping...")
     route_trips_dict = {}
+    trip_to_route_map = {}
+    
     for _, route in all_routes.iterrows():
         route_id = str(route['route_id'])
         route_trips_dict[route_id] = []
@@ -124,27 +148,29 @@ def generate_shuttle_data():
         trip_id = str(trip['trip_id'])
         if route_id in route_trips_dict:
             route_trips_dict[route_id].append(trip_id)
+            trip_to_route_map[trip_id] = route_id
     
-    print(f"Built mapping for {len(route_trips_dict)} routes")
+    print(f"Built mapping for {len(route_trips_dict)} routes and {len(trip_to_route_map)} trips")
     
-    # Process stop_times
+    # Process stop_times using vectorized operations
     print("Processing stop_times.txt to get route stops...")
     route_stops_dict = {}
     for _, route in all_routes.iterrows():
         route_id = str(route['route_id'])
         route_stops_dict[route_id] = set()
     
-    total_lines = len(stop_times_df)
-    print(f"Processing {total_lines} stop-time records...")
+    # Convert to strings and map to routes
+    stop_times_df['trip_id_str'] = stop_times_df['trip_id'].astype(str)
+    stop_times_df['stop_id_str'] = stop_times_df['stop_id'].astype(str)
+    stop_times_df['route_id'] = stop_times_df['trip_id_str'].map(trip_to_route_map)
     
-    for idx, row in tqdm(stop_times_df.iterrows(), total=total_lines, desc="Processing stop times", unit="records"):
-        trip_id = str(row['trip_id'])
-        stop_id = str(row['stop_id'])
-        
-        for route_id in route_trips_dict:
-            if trip_id in route_trips_dict[route_id]:
-                route_stops_dict[route_id].add(stop_id)
-                break
+    # Filter to only shuttle routes
+    shuttle_stop_times = stop_times_df[stop_times_df['route_id'].notna()]
+    
+    # Group by route and collect unique stops
+    print("Grouping stops by route...")
+    for route_id, group in tqdm(shuttle_stop_times.groupby('route_id'), desc="Processing routes", unit="routes"):
+        route_stops_dict[route_id] = set(group['stop_id_str'].unique())
     
     print("Finished processing stop_times.txt")
     
@@ -209,13 +235,14 @@ def generate_shuttle_data():
     print(f"Total routes processed: {len(mbta_shuttle_data)}")
     print(f"Routes with shapes: {len(shuttle_route_shapes)}")
     
-    if mbta_shuttle_data:
-        print("\nShuttle routes:")
-        for route_id, stops in mbta_shuttle_data.items():
-            route_info = all_routes[all_routes['route_id'].astype(str) == route_id]
-            if not route_info.empty:
-                route_name = route_info.iloc[0]['route_long_name']
-                print(f"  {route_id}: {route_name} ({len(stops)} stops)")
+    # Calculate routes with stops only
+    routes_with_stops_only = set(mbta_shuttle_data.keys()) - set(shuttle_route_shapes.keys())
+    print(f"Routes with stops only: {len(routes_with_stops_only)}")
+    
+    if routes_with_stops_only:
+        print("\nRoutes with stops but NO shapes:")
+        for route_id in sorted(routes_with_stops_only):
+            print(f"  - Route {route_id}")
 
 if __name__ == "__main__":
     generate_shuttle_data()

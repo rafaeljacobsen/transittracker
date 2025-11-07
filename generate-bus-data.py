@@ -63,18 +63,46 @@ def load_gtfs_data():
         shapes_df = pd.read_csv(shapes_file)
         print(f"Loaded {len(shapes_df)} shape points from GTFS")
         
-        # Normalize shape_id column (convert float 1160130.0 -> string '1160130')
+        # Normalize shape_id column (convert float 1160130.0 -> string '1160130', and remove leading zeros)
         def normalize_shape_id(val):
             try:
-                if isinstance(val, float) and not pd.isna(val):
+                if pd.isna(val):
+                    return str(val)
+                if isinstance(val, float):
                     return str(int(val))
-                return str(val)
+                # For strings, try to convert to int and back to remove leading zeros
+                s = str(val)
+                try:
+                    return str(int(s))
+                except:
+                    return s
             except:
                 return str(val)
         
-        print("Normalizing shape IDs...")
+        print("Normalizing shape IDs in shapes.txt...")
         shapes_df['shape_id'] = shapes_df['shape_id'].apply(normalize_shape_id)
-        print("Shape IDs normalized")
+        print("Shape IDs normalized in shapes.txt")
+    
+    # Also normalize shape_id in trips.txt to match
+    if 'shape_id' in trips_df.columns:
+        def normalize_shape_id(val):
+            try:
+                if pd.isna(val):
+                    return val
+                if isinstance(val, float):
+                    return str(int(val))
+                # For strings, try to convert to int and back to remove leading zeros
+                s = str(val)
+                try:
+                    return str(int(s))
+                except:
+                    return s
+            except:
+                return str(val)
+        
+        print("Normalizing shape IDs in trips.txt...")
+        trips_df['shape_id'] = trips_df['shape_id'].apply(normalize_shape_id)
+        print("Shape IDs normalized in trips.txt")
     
     return routes_df, stops_df, stop_times_df, trips_df, shapes_df
 
@@ -135,21 +163,12 @@ def get_route_shapes(route_id, trips_df, shapes_df):
     # Get trips for this route - convert route_id column to string for comparison
     route_trips = trips_df[trips_df['route_id'].astype(str) == route_id_str]
     if route_trips.empty:
-        if route_id_str == '116':  # Debug route 116
-            print(f"DEBUG Route 116: No trips found!")
-            print(f"  Sample route_ids in trips: {trips_df['route_id'].head(10).tolist()}")
         return []
     
     # Get shape IDs and convert to strings
     shape_ids = route_trips['shape_id'].dropna().astype(str).unique()
     if len(shape_ids) == 0:
-        if route_id_str == '116':  # Debug route 116
-            print(f"DEBUG Route 116: Found {len(route_trips)} trips but no shape IDs!")
         return []
-    
-    if route_id_str == '116':  # Debug route 116
-        print(f"DEBUG Route 116: Found {len(route_trips)} trips with {len(shape_ids)} unique shapes")
-        print(f"  Shape IDs: {shape_ids[:5]}")
     
     # Get shape data (shape_id is already normalized to string at load time)
     shapes = []
@@ -169,13 +188,6 @@ def get_route_shapes(route_id, trips_df, shapes_df):
                     'shape_id': str(shape_id),
                     'coords': coords
                 })
-        else:
-            if route_id_str == '116':  # Debug route 116
-                print(f"DEBUG Route 116: Shape {shape_id} not found in shapes_df!")
-                print(f"  Sample shape_ids in shapes: {shapes_df['shape_id'].unique()[:10].tolist()}")
-    
-    if route_id_str == '116':  # Debug route 116
-        print(f"DEBUG Route 116: Returning {len(shapes)} shapes")
     
     return shapes
 
@@ -201,14 +213,16 @@ def generate_bus_data():
         route_id = str(route['route_id'])
         route_trips_dict[route_id] = []
     
-    # Populate route_trips_dict from trips.txt
+    # Populate route_trips_dict from trips.txt AND build reverse mapping
+    trip_to_route_map = {}  # Direct trip_id -> route_id lookup
     for _, trip in trips_df.iterrows():
         route_id = str(trip['route_id'])
         trip_id = str(trip['trip_id'])
         if route_id in route_trips_dict:
             route_trips_dict[route_id].append(trip_id)
+            trip_to_route_map[trip_id] = route_id  # Add reverse mapping
     
-    print(f"Built mapping for {len(route_trips_dict)} routes")
+    print(f"Built mapping for {len(route_trips_dict)} routes and {len(trip_to_route_map)} trips")
     
     # Now process stop_times.txt directly like the train script does
     print("Processing stop_times.txt to get route stops...")
@@ -218,19 +232,24 @@ def generate_bus_data():
         route_id = str(route['route_id'])
         route_stops_dict[route_id] = set()
     
-    # Process stop_times.txt line by line with progress bar
+    # Process stop_times.txt MUCH faster using vectorized operations
     total_lines = len(stop_times_df)
     print(f"Processing {total_lines} stop-time records...")
     
-    for idx, row in tqdm(stop_times_df.iterrows(), total=total_lines, desc="Processing stop times", unit="records"):
-        trip_id = str(row['trip_id'])
-        stop_id = str(row['stop_id'])
-        
-        # Find which route this trip belongs to
-        for route_id in route_trips_dict:
-            if trip_id in route_trips_dict[route_id]:
-                route_stops_dict[route_id].add(stop_id)
-                break
+    # Convert to strings for consistent comparison
+    stop_times_df['trip_id_str'] = stop_times_df['trip_id'].astype(str)
+    stop_times_df['stop_id_str'] = stop_times_df['stop_id'].astype(str)
+    
+    # Map trip_ids to route_ids using vectorized operation
+    stop_times_df['route_id'] = stop_times_df['trip_id_str'].map(trip_to_route_map)
+    
+    # Filter to only bus routes we care about
+    bus_stop_times = stop_times_df[stop_times_df['route_id'].notna()]
+    
+    # Group by route and collect unique stops - MUCH faster than iterrows!
+    print("Grouping stops by route...")
+    for route_id, group in tqdm(bus_stop_times.groupby('route_id'), desc="Processing routes", unit="routes"):
+        route_stops_dict[route_id] = set(group['stop_id_str'].unique())
     
     print("Finished processing stop_times.txt")
     
@@ -315,24 +334,19 @@ def generate_bus_data():
     print("="*50)
     print(f"Total routes processed: {len(mbta_bus_data)}")
     print(f"Routes with shapes: {len(bus_route_shapes)}")
+    
     # Calculate routes that have both stops and shapes
     routes_with_both = set(mbta_bus_data.keys()) & set(bus_route_shapes.keys())
     routes_with_stops_only = set(mbta_bus_data.keys()) - set(bus_route_shapes.keys())
-    routes_with_shapes_only = set(bus_route_shapes.keys()) - set(mbta_bus_data.keys())
     
     print(f"Routes with both stops and shapes: {len(routes_with_both)}")
     print(f"Routes with stops only: {len(routes_with_stops_only)}")
-    print(f"Routes with shapes only: {len(routes_with_shapes_only)}")
-    print(f"Total routes with data: {len(mbta_bus_data)}")
-    print(f"Total routes with shapes: {len(bus_route_shapes)}")
     
-    # Show some example routes
-    print("\nExample routes:")
-    for i, (route_id, stops) in enumerate(list(mbta_bus_data.items())[:5]):
-        print(f"  {route_id}: {len(stops)} stops")
-    
-    if len(mbta_bus_data) > 5:
-        print(f"  ... and {len(mbta_bus_data) - 5} more routes")
+    # Print routes with stops only (missing shapes)
+    if routes_with_stops_only:
+        print("\nRoutes with stops but NO shapes:")
+        for route_id in sorted(routes_with_stops_only):
+            print(f"  - Route {route_id}")
 
 if __name__ == "__main__":
     generate_bus_data()

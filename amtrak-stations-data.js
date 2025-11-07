@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-08-20T10:28:57.123453",
+  "timestamp": "2025-11-07T11:08:38.509698",
   "source": "Amtraker V3 API",
-  "totalStations": 847,
+  "totalStations": 916,
   "stations": [
     {
       "stationId": "ABE",
@@ -5053,6 +5053,366 @@
       "lon": -114.615571
     },
     {
+      "stationId": "BEKW",
+      "name": "Miami",
+      "city": "",
+      "state": "",
+      "tz": "America/New_York",
+      "lat": 25.77997,
+      "lon": -80.19564
+    },
+    {
+      "stationId": "BAVE",
+      "name": "Aventura",
+      "city": "",
+      "state": "",
+      "tz": "America/New_York",
+      "lat": 25.95846,
+      "lon": -80.14728
+    },
+    {
+      "stationId": "BFBT",
+      "name": "Fort Lauderdale",
+      "city": "",
+      "state": "",
+      "tz": "America/New_York",
+      "lat": 26.12362,
+      "lon": -80.14555
+    },
+    {
+      "stationId": "BRRN",
+      "name": "Boca Raton",
+      "city": "",
+      "state": "",
+      "tz": "America/New_York",
+      "lat": 26.35383,
+      "lon": -80.08749
+    },
+    {
+      "stationId": "BWPT",
+      "name": "West Palm Beach",
+      "city": "",
+      "state": "",
+      "tz": "America/New_York",
+      "lat": 26.71202,
+      "lon": -80.05536
+    },
+    {
+      "stationId": "BMCO",
+      "name": "Orlando",
+      "city": "",
+      "state": "",
+      "tz": "America/New_York",
+      "lat": 28.4117,
+      "lon": -81.30762
+    },
+    {
+      "stationId": "JASP",
+      "name": "Jasper",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 52.8757287911,
+      "lon": -118.079386435
+    },
+    {
+      "stationId": "HRVY",
+      "name": "Harvey",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 52.9583306205,
+      "lon": -119.446827647
+    },
+    {
+      "stationId": "DNST",
+      "name": "Dunster",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.123413,
+      "lon": -119.837813
+    },
+    {
+      "stationId": "MCBR",
+      "name": "McBride",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.300555,
+      "lon": -120.1703
+    },
+    {
+      "stationId": "GOAT",
+      "name": "Goat River",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.537695,
+      "lon": -120.592519
+    },
+    {
+      "stationId": "LOOS",
+      "name": "Loos",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.607823,
+      "lon": -120.723372
+    },
+    {
+      "stationId": "DOMC",
+      "name": "Dome Creek",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.748105,
+      "lon": -121.029926
+    },
+    {
+      "stationId": "BEND",
+      "name": "Bend",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.767341,
+      "lon": -121.065261
+    },
+    {
+      "stationId": "PENN",
+      "name": "Penny",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.842544,
+      "lon": -121.28936
+    },
+    {
+      "stationId": "LWTH",
+      "name": "Longworth",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.922269,
+      "lon": -121.463494
+    },
+    {
+      "stationId": "HUTT",
+      "name": "Hutton",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.988689,
+      "lon": -121.621631
+    },
+    {
+      "stationId": "SINM",
+      "name": "Sinclair Mills",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.019372,
+      "lon": -121.678516
+    },
+    {
+      "stationId": "MCGR",
+      "name": "McGregor",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.076925,
+      "lon": -121.843477
+    },
+    {
+      "stationId": "UFRZ",
+      "name": "Upper Frazer",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.120005,
+      "lon": -121.946648
+    },
+    {
+      "stationId": "ALZL",
+      "name": "Aleza Lake",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.114831,
+      "lon": -122.055129
+    },
+    {
+      "stationId": "WILR",
+      "name": "Willow River",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.073935,
+      "lon": -122.477345
+    },
+    {
+      "stationId": "PGEO",
+      "name": "Prince George",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 53.919317,
+      "lon": -122.744185
+    },
+    {
+      "stationId": "VDRH",
+      "name": "Vanderhoof",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.014597,
+      "lon": -124.012017
+    },
+    {
+      "stationId": "FFRA",
+      "name": "Fort Fraser",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.058416,
+      "lon": -124.554224
+    },
+    {
+      "stationId": "ENDA",
+      "name": "Endako",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.085253,
+      "lon": -125.021369
+    },
+    {
+      "stationId": "BRNL",
+      "name": "Burns Lake",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.228971,
+      "lon": -125.764128
+    },
+    {
+      "stationId": "HOUS",
+      "name": "Houston",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.400327,
+      "lon": -126.650353
+    },
+    {
+      "stationId": "TELK",
+      "name": "Telkwa",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.6914023016,
+      "lon": -127.050533767
+    },
+    {
+      "stationId": "SMTR",
+      "name": "Smithers",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.777708,
+      "lon": -127.176219
+    },
+    {
+      "stationId": "NHAZ",
+      "name": "New Hazelton",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 55.25068,
+      "lon": -127.578331
+    },
+    {
+      "stationId": "KITW",
+      "name": "Kitwanga",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 55.099343,
+      "lon": -128.051963
+    },
+    {
+      "stationId": "CEDA",
+      "name": "Cedarvale",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 55.020764,
+      "lon": -128.323192
+    },
+    {
+      "stationId": "DORR",
+      "name": "Dorreen",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.840788,
+      "lon": -128.343892
+    },
+    {
+      "stationId": "PACI",
+      "name": "Pacific",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.770815,
+      "lon": -128.272199
+    },
+    {
+      "stationId": "USKX",
+      "name": "Usk",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.636477,
+      "lon": -128.416014
+    },
+    {
+      "stationId": "TRRC",
+      "name": "Terrace",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.514492,
+      "lon": -128.586584
+    },
+    {
+      "stationId": "KWIN",
+      "name": "Kwinitsa",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.225714,
+      "lon": -129.555598
+    },
+    {
+      "stationId": "CASS",
+      "name": "Cassiar Cannery",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.1780216868,
+      "lon": -130.17639658
+    },
+    {
+      "stationId": "PRUP",
+      "name": "Prince Rupert",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 54.2956651137,
+      "lon": -130.352241212
+    },
+    {
       "stationId": "SHYA",
       "name": "Saint-Hyacinthe",
       "city": "",
@@ -5078,6 +5438,213 @@
       "tz": "America/Toronto",
       "lat": 46.7542382955,
       "lon": -71.2975749888
+    },
+    {
+      "stationId": "MMGY",
+      "name": "Montmagny",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 46.9732660745,
+      "lon": -70.5596334041
+    },
+    {
+      "stationId": "LPOC",
+      "name": "La Pocatière",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.3611439876,
+      "lon": -70.0252708213
+    },
+    {
+      "stationId": "RDLX",
+      "name": "Rivière-du-Loup",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.8252985049,
+      "lon": -69.5276737387
+    },
+    {
+      "stationId": "TPIS",
+      "name": "Trois Pistoles",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.1270018367,
+      "lon": -69.1732956785
+    },
+    {
+      "stationId": "RMSK",
+      "name": "Rimouski",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.4500986913,
+      "lon": -68.5212130944
+    },
+    {
+      "stationId": "MJLI",
+      "name": "Mont-Joli",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.589238,
+      "lon": -68.188993
+    },
+    {
+      "stationId": "SAYA",
+      "name": "Sayabec",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.558674,
+      "lon": -67.689528
+    },
+    {
+      "stationId": "AMQU",
+      "name": "Amqui",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.46626,
+      "lon": -67.436172
+    },
+    {
+      "stationId": "CAUS",
+      "name": "Causapscal",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.3496066382,
+      "lon": -67.2272006184
+    },
+    {
+      "stationId": "MTPD",
+      "name": "Matapédia",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.9747533063,
+      "lon": -66.9392200995
+    },
+    {
+      "stationId": "CBTN",
+      "name": "Campbellton",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 48.004856,
+      "lon": -66.67838
+    },
+    {
+      "stationId": "CHLO",
+      "name": "Charlo",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 47.99419,
+      "lon": -66.304574
+    },
+    {
+      "stationId": "JACR",
+      "name": "Jacquet River",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 47.92025,
+      "lon": -66.000188
+    },
+    {
+      "stationId": "PROC",
+      "name": "Petit Rocher",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 47.778731944,
+      "lon": -65.7298964835
+    },
+    {
+      "stationId": "BTRS",
+      "name": "Bathurst",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 47.618787,
+      "lon": -65.670923
+    },
+    {
+      "stationId": "MIRA",
+      "name": "Miramichi",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 47.0047630786,
+      "lon": -65.5735509888
+    },
+    {
+      "stationId": "RGRV",
+      "name": "Rogersville",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 46.7295010582,
+      "lon": -65.4255170966
+    },
+    {
+      "stationId": "MCTN",
+      "name": "Moncton",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 46.0832528225,
+      "lon": -64.7859600592
+    },
+    {
+      "stationId": "SACK",
+      "name": "Sackville",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 45.8901622082,
+      "lon": -64.3672682037
+    },
+    {
+      "stationId": "AMHS",
+      "name": "Amherst",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 45.8299867039,
+      "lon": -64.2123841706
+    },
+    {
+      "stationId": "SPRJ",
+      "name": "Springhill Jct.",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 45.6917841473,
+      "lon": -64.1112508945
+    },
+    {
+      "stationId": "TRUR",
+      "name": "Truro",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 45.3624136652,
+      "lon": -63.2759008362
+    },
+    {
+      "stationId": "HLFX",
+      "name": "Halifax",
+      "city": "",
+      "state": "",
+      "tz": "America/Halifax",
+      "lat": 44.6392,
+      "lon": -63.567692
     },
     {
       "stationId": "QBEC",
@@ -5890,6 +6457,15 @@
       "lon": -72.244177
     },
     {
+      "stationId": "NCLC",
+      "name": "Club Nicol",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.575221,
+      "lon": -72.24106
+    },
+    {
       "stationId": "HRDL",
       "name": "Hirondelle",
       "city": "",
@@ -6068,6 +6644,15 @@
       "tz": "America/Toronto",
       "lat": 46.442072,
       "lon": -72.921677
+    },
+    {
+      "stationId": "SPAU",
+      "name": "Saint-Paulin",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 46.401095452,
+      "lon": -73.015965145
     },
     {
       "stationId": "SJUS",
@@ -6538,211 +7123,310 @@
       "lon": -72.782394
     },
     {
-      "stationId": "SPAU",
-      "name": "Saint-Paulin",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 46.401095452,
-      "lon": -73.015965145
-    },
-    {
-      "stationId": "MSNH",
-      "name": "Mission Harbour",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 49.1284044691,
-      "lon": -122.303479458
-    },
-    {
-      "stationId": "AGAS",
-      "name": "Agassiz",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 49.239552,
-      "lon": -121.764238
-    },
-    {
-      "stationId": "KATZ",
-      "name": "Katz",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 49.3686134626,
-      "lon": -121.551229101
-    },
-    {
-      "stationId": "NBND",
-      "name": "North Bend",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 49.876867,
-      "lon": -121.449673
-    },
-    {
-      "stationId": "ASHN",
-      "name": "Ashcroft",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 50.730397,
-      "lon": -121.26929
-    },
-    {
-      "stationId": "KAMN",
-      "name": "Kamloops North",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 50.718257,
-      "lon": -120.3484611
-    },
-    {
-      "stationId": "CLWT",
-      "name": "Clearwater",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 51.63789,
-      "lon": -120.033379
-    },
-    {
-      "stationId": "BLUE",
-      "name": "Blue River",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 52.105382,
-      "lon": -119.300439
-    },
-    {
-      "stationId": "VLMT",
-      "name": "Valemount",
-      "city": "",
-      "state": "",
-      "tz": "America/Vancouver",
-      "lat": 52.8348571623,
-      "lon": -119.26169207
-    },
-    {
-      "stationId": "JASP",
-      "name": "Jasper",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 52.8757287911,
-      "lon": -118.079386435
-    },
-    {
-      "stationId": "HINT",
-      "name": "Hinton",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 53.4005,
-      "lon": -117.590048
-    },
-    {
-      "stationId": "EDSN",
-      "name": "Edson",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 53.579558,
-      "lon": -116.430566
-    },
-    {
-      "stationId": "EVAN",
-      "name": "Evansburg",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 53.594514,
-      "lon": -115.008595
-    },
-    {
-      "stationId": "EDMO",
-      "name": "Edmonton",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 53.5788568398,
-      "lon": -113.530943532
-    },
-    {
-      "stationId": "VKNG",
-      "name": "Viking",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 53.092586,
-      "lon": -111.778133
-    },
-    {
-      "stationId": "WAIN",
-      "name": "Wainwright",
-      "city": "",
-      "state": "",
-      "tz": "America/Edmonton",
-      "lat": 52.832862,
-      "lon": -110.864573
-    },
-    {
-      "stationId": "UNIT",
-      "name": "Unity",
-      "city": "",
-      "state": "",
-      "tz": "America/Regina",
-      "lat": 52.441105,
-      "lon": -109.160175
-    },
-    {
-      "stationId": "BIGG",
-      "name": "Biggar",
-      "city": "",
-      "state": "",
-      "tz": "America/Regina",
-      "lat": 52.053720315,
-      "lon": -107.988277025
-    },
-    {
-      "stationId": "SASK",
-      "name": "Saskatoon",
-      "city": "",
-      "state": "",
-      "tz": "America/Regina",
-      "lat": 52.1045419038,
-      "lon": -106.738216939
-    },
-    {
-      "stationId": "WATR",
-      "name": "Watrous",
-      "city": "",
-      "state": "",
-      "tz": "America/Regina",
-      "lat": 51.670986,
-      "lon": -105.468425
-    },
-    {
-      "stationId": "MELV",
-      "name": "Melville",
-      "city": "",
-      "state": "",
-      "tz": "America/Regina",
-      "lat": 50.9258992573,
-      "lon": -102.807582667
-    },
-    {
-      "stationId": "RVRS",
-      "name": "Rivers",
+      "stationId": "CHUR",
+      "name": "Churchill",
       "city": "",
       "state": "",
       "tz": "America/Winnipeg",
-      "lat": 50.029121,
-      "lon": -100.240722
+      "lat": 58.767685933,
+      "lon": -94.1747663006
+    },
+    {
+      "stationId": "TIDL",
+      "name": "Tidal",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 58.6600071977,
+      "lon": -94.120781119
+    },
+    {
+      "stationId": "CHES",
+      "name": "Chesnaye",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 58.19565,
+      "lon": -94.146912
+    },
+    {
+      "stationId": "MCLI",
+      "name": "M'Clintock",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 57.801091,
+      "lon": -94.214341
+    },
+    {
+      "stationId": "ODAY",
+      "name": "O'Day",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 57.5975850033,
+      "lon": -94.210193254
+    },
+    {
+      "stationId": "HERC",
+      "name": "Herchmer",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 57.387128,
+      "lon": -94.190914
+    },
+    {
+      "stationId": "THIB",
+      "name": "Thibaudeau",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 57.082879,
+      "lon": -94.146446
+    },
+    {
+      "stationId": "WEIR",
+      "name": "Weir River",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 56.817819,
+      "lon": -94.0932948135
+    },
+    {
+      "stationId": "AMRY",
+      "name": "Amery",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 56.559037,
+      "lon": -94.071896
+    },
+    {
+      "stationId": "BIRD",
+      "name": "Bird",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 56.495287,
+      "lon": -94.234842
+    },
+    {
+      "stationId": "GILL",
+      "name": "Gillam",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 56.347184109,
+      "lon": -94.6995585251
+    },
+    {
+      "stationId": "WVHO",
+      "name": "Wivenhoe",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 56.176547,
+      "lon": -95.213765
+    },
+    {
+      "stationId": "ILFO",
+      "name": "Ilford",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 56.0652428777,
+      "lon": -95.6050550086
+    },
+    {
+      "stationId": "PITS",
+      "name": "Pit Siding",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.91519,
+      "lon": -96.299691
+    },
+    {
+      "stationId": "BRGR",
+      "name": "Bridgar",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.636842,
+      "lon": -97.06135
+    },
+    {
+      "stationId": "PIKW",
+      "name": "Pikwitonei",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.5852,
+      "lon": -97.154737
+    },
+    {
+      "stationId": "SIPI",
+      "name": "Sipiwesk",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.462715,
+      "lon": -97.388531
+    },
+    {
+      "stationId": "THOM",
+      "name": "Thompson",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.740715,
+      "lon": -97.830098
+    },
+    {
+      "stationId": "LEVN",
+      "name": "Leven",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.381287,
+      "lon": -97.541302
+    },
+    {
+      "stationId": "THKP",
+      "name": "Thicket Portage",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.319002,
+      "lon": -97.688068
+    },
+    {
+      "stationId": "HOCK",
+      "name": "Hockin",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.275929,
+      "lon": -97.832626
+    },
+    {
+      "stationId": "ODHI",
+      "name": "Odhill",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.108691,
+      "lon": -98.223475
+    },
+    {
+      "stationId": "LYDD",
+      "name": "Lyddal",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 55.029422,
+      "lon": -98.414532
+    },
+    {
+      "stationId": "WBDN",
+      "name": "Wabowden",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.909127,
+      "lon": -98.630582
+    },
+    {
+      "stationId": "PIPN",
+      "name": "Pipun",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.8400980699,
+      "lon": -98.7531758307
+    },
+    {
+      "stationId": "PNTN",
+      "name": "Ponton",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.642871,
+      "lon": -99.16161
+    },
+    {
+      "stationId": "TURN",
+      "name": "Turnbull",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.565673,
+      "lon": -99.480695
+    },
+    {
+      "stationId": "WEKU",
+      "name": "Wekusko",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.5032988042,
+      "lon": -99.7527070932
+    },
+    {
+      "stationId": "DYCE",
+      "name": "Dyce",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.364476,
+      "lon": -100.17011
+    },
+    {
+      "stationId": "DERI",
+      "name": "Dering",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.252945,
+      "lon": -100.53751
+    },
+    {
+      "stationId": "CORM",
+      "name": "Cormorant",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.2234529106,
+      "lon": -100.602586644
+    },
+    {
+      "stationId": "HALC",
+      "name": "Halcrow",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 54.175608,
+      "lon": -100.630658
+    },
+    {
+      "stationId": "OROK",
+      "name": "Orok",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 53.957776,
+      "lon": -101.058596
+    },
+    {
+      "stationId": "TPAS",
+      "name": "The Pas",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 53.823964,
+      "lon": -101.247540962
     },
     {
       "stationId": "PLPX",
@@ -6752,393 +7436,6 @@
       "tz": "America/Winnipeg",
       "lat": 49.977384,
       "lon": -98.288261
-    },
-    {
-      "stationId": "WNPG",
-      "name": "Winnipeg",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.8893855363,
-      "lon": -97.1335833128
-    },
-    {
-      "stationId": "ELMA",
-      "name": "Elma",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.874105,
-      "lon": -95.910047
-    },
-    {
-      "stationId": "BRTL",
-      "name": "Brereton Lake",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.88043558,
-      "lon": -95.5306380583
-    },
-    {
-      "stationId": "OPHR",
-      "name": "Ophir",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.870822,
-      "lon": -95.260035
-    },
-    {
-      "stationId": "WNTB",
-      "name": "Winnitoba",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.8835958588,
-      "lon": -95.1946000933
-    },
-    {
-      "stationId": "RCLK",
-      "name": "Rice Lake",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.890343,
-      "lon": -95.130523
-    },
-    {
-      "stationId": "COPE",
-      "name": "Copelands Landing",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.9174948374,
-      "lon": -95.0013445827
-    },
-    {
-      "stationId": "MLCH",
-      "name": "Malachi",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.929327,
-      "lon": -94.9908758981
-    },
-    {
-      "stationId": "OTTM",
-      "name": "Ottermere",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.924212,
-      "lon": -94.935315
-    },
-    {
-      "stationId": "MNKI",
-      "name": "Minaki",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.9849728409,
-      "lon": -94.6701567655
-    },
-    {
-      "stationId": "RDDT",
-      "name": "Redditt",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.978668,
-      "lon": -94.393284
-    },
-    {
-      "stationId": "FARL",
-      "name": "Farlane",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 50.007073,
-      "lon": -94.200478
-    },
-    {
-      "stationId": "CNYK",
-      "name": "Canyon",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.9800724031,
-      "lon": -93.744402
-    },
-    {
-      "stationId": "RLRX",
-      "name": "Red Lake Road",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.973263,
-      "lon": -93.357647
-    },
-    {
-      "stationId": "RCHN",
-      "name": "Richan",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 49.9948359438,
-      "lon": -92.82826471
-    },
-    {
-      "stationId": "SLKT",
-      "name": "Sioux Lookout",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 50.0973851762,
-      "lon": -91.916294717
-    },
-    {
-      "stationId": "SAVL",
-      "name": "Savant Lake",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 50.2385299654,
-      "lon": -90.7064802526
-    },
-    {
-      "stationId": "FLTL",
-      "name": "Flindt Landing",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 50.242603,
-      "lon": -90.477618
-    },
-    {
-      "stationId": "ALWB",
-      "name": "Allanwater Bridge",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 50.2406653823,
-      "lon": -90.1668862897
-    },
-    {
-      "stationId": "COLL",
-      "name": "Collins",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 50.295803,
-      "lon": -89.448909
-    },
-    {
-      "stationId": "ARMG",
-      "name": "Armstrong",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 50.301424,
-      "lon": -89.037603
-    },
-    {
-      "stationId": "MUDR",
-      "name": "Mud River",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 50.3185245402,
-      "lon": -88.5166489767
-    },
-    {
-      "stationId": "FERL",
-      "name": "Ferland",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 50.3144192767,
-      "lon": -88.4259900919
-    },
-    {
-      "stationId": "AUDN",
-      "name": "Auden",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 50.2291662511,
-      "lon": -87.8898751779
-    },
-    {
-      "stationId": "NAKI",
-      "name": "Nakina",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 50.17773,
-      "lon": -86.71351
-    },
-    {
-      "stationId": "LLAC",
-      "name": "Longlac",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 49.771858,
-      "lon": -86.534975
-    },
-    {
-      "stationId": "CARA",
-      "name": "Caramat",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 49.617783,
-      "lon": -86.13815
-    },
-    {
-      "stationId": "HLSP",
-      "name": "Hillsport",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 49.451026,
-      "lon": -85.54803
-    },
-    {
-      "stationId": "HNPN",
-      "name": "Hornepayne",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 49.217193,
-      "lon": -84.773569
-    },
-    {
-      "stationId": "OBAX",
-      "name": "Oba",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 49.059565,
-      "lon": -84.105718
-    },
-    {
-      "stationId": "ELSA",
-      "name": "Elsas",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 48.521081,
-      "lon": -82.9031
-    },
-    {
-      "stationId": "FOLE",
-      "name": "Foleyet",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 48.246841,
-      "lon": -82.440259
-    },
-    {
-      "stationId": "GOGA",
-      "name": "Gogama",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 47.6761105078,
-      "lon": -81.7237168982
-    },
-    {
-      "stationId": "WSTR",
-      "name": "Westree",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 47.418601,
-      "lon": -81.547963
-    },
-    {
-      "stationId": "RUEL",
-      "name": "Ruel",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 47.2592165926,
-      "lon": -81.467846
-    },
-    {
-      "stationId": "FELX",
-      "name": "Felix",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 47.20425,
-      "lon": -81.407763
-    },
-    {
-      "stationId": "MCKC",
-      "name": "McKee's Camp",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 47.1064600218,
-      "lon": -81.2590280552
-    },
-    {
-      "stationId": "LAFO",
-      "name": "Laforest",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 47.0346825884,
-      "lon": -81.2142134206
-    },
-    {
-      "stationId": "CAPR",
-      "name": "Capreol",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 46.711226,
-      "lon": -80.929777
-    },
-    {
-      "stationId": "SUDJ",
-      "name": "Sudbury Jct",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 46.5246102838,
-      "lon": -80.9020861775
-    },
-    {
-      "stationId": "PARS",
-      "name": "Parry Sound",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 45.3507602837,
-      "lon": -80.037136248
-    },
-    {
-      "stationId": "WSHG",
-      "name": "Washago",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 44.748362,
-      "lon": -79.334872
-    },
-    {
-      "stationId": "SPAR",
-      "name": "South Parry",
-      "city": "",
-      "state": "",
-      "tz": "America/Toronto",
-      "lat": 45.3459099307,
-      "lon": -80.0378863644
     },
     {
       "stationId": "GSTO",
@@ -7312,319 +7609,643 @@
       "lon": -102.396713449
     },
     {
-      "stationId": "TPAS",
-      "name": "The Pas",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 53.823964,
-      "lon": -101.247540962
-    },
-    {
-      "stationId": "OROK",
-      "name": "Orok",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 53.957776,
-      "lon": -101.058596
-    },
-    {
-      "stationId": "HALC",
-      "name": "Halcrow",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.175608,
-      "lon": -100.630658
-    },
-    {
-      "stationId": "CORM",
-      "name": "Cormorant",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.2234529106,
-      "lon": -100.602586644
-    },
-    {
-      "stationId": "DERI",
-      "name": "Dering",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.252945,
-      "lon": -100.53751
-    },
-    {
-      "stationId": "DYCE",
-      "name": "Dyce",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.364476,
-      "lon": -100.17011
-    },
-    {
-      "stationId": "WEKU",
-      "name": "Wekusko",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.5032988042,
-      "lon": -99.7527070932
-    },
-    {
-      "stationId": "TURN",
-      "name": "Turnbull",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.565673,
-      "lon": -99.480695
-    },
-    {
-      "stationId": "PNTN",
-      "name": "Ponton",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.642871,
-      "lon": -99.16161
-    },
-    {
-      "stationId": "PIPN",
-      "name": "Pipun",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.8400980699,
-      "lon": -98.7531758307
-    },
-    {
-      "stationId": "WBDN",
-      "name": "Wabowden",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 54.909127,
-      "lon": -98.630582
-    },
-    {
-      "stationId": "LYDD",
-      "name": "Lyddal",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.029422,
-      "lon": -98.414532
-    },
-    {
-      "stationId": "ODHI",
-      "name": "Odhill",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.108691,
-      "lon": -98.223475
-    },
-    {
-      "stationId": "HOCK",
-      "name": "Hockin",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.275929,
-      "lon": -97.832626
-    },
-    {
-      "stationId": "THKP",
-      "name": "Thicket Portage",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.319002,
-      "lon": -97.688068
-    },
-    {
-      "stationId": "LEVN",
-      "name": "Leven",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.381287,
-      "lon": -97.541302
-    },
-    {
-      "stationId": "THOM",
-      "name": "Thompson",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.740715,
-      "lon": -97.830098
-    },
-    {
-      "stationId": "SIPI",
-      "name": "Sipiwesk",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.462715,
-      "lon": -97.388531
-    },
-    {
-      "stationId": "PIKW",
-      "name": "Pikwitonei",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.5852,
-      "lon": -97.154737
-    },
-    {
-      "stationId": "BRGR",
-      "name": "Bridgar",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.636842,
-      "lon": -97.06135
-    },
-    {
-      "stationId": "PITS",
-      "name": "Pit Siding",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 55.91519,
-      "lon": -96.299691
-    },
-    {
-      "stationId": "ILFO",
-      "name": "Ilford",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 56.0652428777,
-      "lon": -95.6050550086
-    },
-    {
-      "stationId": "WVHO",
-      "name": "Wivenhoe",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 56.176547,
-      "lon": -95.213765
-    },
-    {
-      "stationId": "GILL",
-      "name": "Gillam",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 56.347184109,
-      "lon": -94.6995585251
-    },
-    {
-      "stationId": "BIRD",
-      "name": "Bird",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 56.495287,
-      "lon": -94.234842
-    },
-    {
-      "stationId": "AMRY",
-      "name": "Amery",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 56.559037,
-      "lon": -94.071896
-    },
-    {
-      "stationId": "WEIR",
-      "name": "Weir River",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 56.817819,
-      "lon": -94.0932948135
-    },
-    {
-      "stationId": "THIB",
-      "name": "Thibaudeau",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 57.082879,
-      "lon": -94.146446
-    },
-    {
-      "stationId": "HERC",
-      "name": "Herchmer",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 57.387128,
-      "lon": -94.190914
-    },
-    {
-      "stationId": "ODAY",
-      "name": "O'Day",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 57.5975850033,
-      "lon": -94.210193254
-    },
-    {
-      "stationId": "MCLI",
-      "name": "M'Clintock",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 57.801091,
-      "lon": -94.214341
-    },
-    {
-      "stationId": "CHES",
-      "name": "Chesnaye",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 58.19565,
-      "lon": -94.146912
-    },
-    {
-      "stationId": "TIDL",
-      "name": "Tidal",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 58.6600071977,
-      "lon": -94.120781119
-    },
-    {
-      "stationId": "CHUR",
-      "name": "Churchill",
-      "city": "",
-      "state": "",
-      "tz": "America/Winnipeg",
-      "lat": 58.767685933,
-      "lon": -94.1747663006
-    },
-    {
-      "stationId": "NCLC",
-      "name": "Club Nicol",
+      "stationId": "WSHG",
+      "name": "Washago",
       "city": "",
       "state": "",
       "tz": "America/Toronto",
-      "lat": 47.575221,
-      "lon": -72.24106
+      "lat": 44.748362,
+      "lon": -79.334872
+    },
+    {
+      "stationId": "SPAR",
+      "name": "South Parry",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 45.3459099307,
+      "lon": -80.0378863644
+    },
+    {
+      "stationId": "SUDJ",
+      "name": "Sudbury Jct",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 46.5246102838,
+      "lon": -80.9020861775
+    },
+    {
+      "stationId": "CAPR",
+      "name": "Capreol",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 46.711226,
+      "lon": -80.929777
+    },
+    {
+      "stationId": "LAFO",
+      "name": "Laforest",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.0346825884,
+      "lon": -81.2142134206
+    },
+    {
+      "stationId": "MCKC",
+      "name": "McKee's Camp",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.1064600218,
+      "lon": -81.2590280552
+    },
+    {
+      "stationId": "FELX",
+      "name": "Felix",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.20425,
+      "lon": -81.407763
+    },
+    {
+      "stationId": "RUEL",
+      "name": "Ruel",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.2592165926,
+      "lon": -81.467846
+    },
+    {
+      "stationId": "WSTR",
+      "name": "Westree",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.418601,
+      "lon": -81.547963
+    },
+    {
+      "stationId": "GOGA",
+      "name": "Gogama",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 47.6761105078,
+      "lon": -81.7237168982
+    },
+    {
+      "stationId": "FOLE",
+      "name": "Foleyet",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.246841,
+      "lon": -82.440259
+    },
+    {
+      "stationId": "ELSA",
+      "name": "Elsas",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 48.521081,
+      "lon": -82.9031
+    },
+    {
+      "stationId": "OBAX",
+      "name": "Oba",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 49.059565,
+      "lon": -84.105718
+    },
+    {
+      "stationId": "HNPN",
+      "name": "Hornepayne",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 49.217193,
+      "lon": -84.773569
+    },
+    {
+      "stationId": "HLSP",
+      "name": "Hillsport",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 49.451026,
+      "lon": -85.54803
+    },
+    {
+      "stationId": "CARA",
+      "name": "Caramat",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 49.617783,
+      "lon": -86.13815
+    },
+    {
+      "stationId": "LLAC",
+      "name": "Longlac",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 49.771858,
+      "lon": -86.534975
+    },
+    {
+      "stationId": "NAKI",
+      "name": "Nakina",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 50.17773,
+      "lon": -86.71351
+    },
+    {
+      "stationId": "AUDN",
+      "name": "Auden",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 50.2291662511,
+      "lon": -87.8898751779
+    },
+    {
+      "stationId": "FERL",
+      "name": "Ferland",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 50.3144192767,
+      "lon": -88.4259900919
+    },
+    {
+      "stationId": "MUDR",
+      "name": "Mud River",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 50.3185245402,
+      "lon": -88.5166489767
+    },
+    {
+      "stationId": "ARMG",
+      "name": "Armstrong",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 50.301424,
+      "lon": -89.037603
+    },
+    {
+      "stationId": "COLL",
+      "name": "Collins",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 50.295803,
+      "lon": -89.448909
+    },
+    {
+      "stationId": "ALWB",
+      "name": "Allanwater Bridge",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 50.2406653823,
+      "lon": -90.1668862897
+    },
+    {
+      "stationId": "FLTL",
+      "name": "Flindt Landing",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 50.242603,
+      "lon": -90.477618
+    },
+    {
+      "stationId": "SAVL",
+      "name": "Savant Lake",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 50.2385299654,
+      "lon": -90.7064802526
+    },
+    {
+      "stationId": "SLKT",
+      "name": "Sioux Lookout",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 50.0973851762,
+      "lon": -91.916294717
+    },
+    {
+      "stationId": "RCHN",
+      "name": "Richan",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.9948359438,
+      "lon": -92.82826471
+    },
+    {
+      "stationId": "RLRX",
+      "name": "Red Lake Road",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.973263,
+      "lon": -93.357647
+    },
+    {
+      "stationId": "CNYK",
+      "name": "Canyon",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.9800724031,
+      "lon": -93.744402
+    },
+    {
+      "stationId": "FARL",
+      "name": "Farlane",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 50.007073,
+      "lon": -94.200478
+    },
+    {
+      "stationId": "RDDT",
+      "name": "Redditt",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.978668,
+      "lon": -94.393284
+    },
+    {
+      "stationId": "MNKI",
+      "name": "Minaki",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.9849728409,
+      "lon": -94.6701567655
+    },
+    {
+      "stationId": "OTTM",
+      "name": "Ottermere",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.924212,
+      "lon": -94.935315
+    },
+    {
+      "stationId": "MLCH",
+      "name": "Malachi",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.929327,
+      "lon": -94.9908758981
+    },
+    {
+      "stationId": "COPE",
+      "name": "Copelands Landing",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.9174948374,
+      "lon": -95.0013445827
+    },
+    {
+      "stationId": "RCLK",
+      "name": "Rice Lake",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.890343,
+      "lon": -95.130523
+    },
+    {
+      "stationId": "WNTB",
+      "name": "Winnitoba",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.8835958588,
+      "lon": -95.1946000933
+    },
+    {
+      "stationId": "OPHR",
+      "name": "Ophir",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.870822,
+      "lon": -95.260035
+    },
+    {
+      "stationId": "BRTL",
+      "name": "Brereton Lake",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.88043558,
+      "lon": -95.5306380583
+    },
+    {
+      "stationId": "ELMA",
+      "name": "Elma",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.874105,
+      "lon": -95.910047
+    },
+    {
+      "stationId": "WNPG",
+      "name": "Winnipeg",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 49.8893855363,
+      "lon": -97.1335833128
+    },
+    {
+      "stationId": "RVRS",
+      "name": "Rivers",
+      "city": "",
+      "state": "",
+      "tz": "America/Winnipeg",
+      "lat": 50.029121,
+      "lon": -100.240722
+    },
+    {
+      "stationId": "MELV",
+      "name": "Melville",
+      "city": "",
+      "state": "",
+      "tz": "America/Regina",
+      "lat": 50.9258992573,
+      "lon": -102.807582667
+    },
+    {
+      "stationId": "WATR",
+      "name": "Watrous",
+      "city": "",
+      "state": "",
+      "tz": "America/Regina",
+      "lat": 51.670986,
+      "lon": -105.468425
+    },
+    {
+      "stationId": "SASK",
+      "name": "Saskatoon",
+      "city": "",
+      "state": "",
+      "tz": "America/Regina",
+      "lat": 52.1045419038,
+      "lon": -106.738216939
+    },
+    {
+      "stationId": "BIGG",
+      "name": "Biggar",
+      "city": "",
+      "state": "",
+      "tz": "America/Regina",
+      "lat": 52.053720315,
+      "lon": -107.988277025
+    },
+    {
+      "stationId": "UNIT",
+      "name": "Unity",
+      "city": "",
+      "state": "",
+      "tz": "America/Regina",
+      "lat": 52.441105,
+      "lon": -109.160175
+    },
+    {
+      "stationId": "WAIN",
+      "name": "Wainwright",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 52.832862,
+      "lon": -110.864573
+    },
+    {
+      "stationId": "VKNG",
+      "name": "Viking",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 53.092586,
+      "lon": -111.778133
+    },
+    {
+      "stationId": "EDMO",
+      "name": "Edmonton",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 53.5788568398,
+      "lon": -113.530943532
+    },
+    {
+      "stationId": "EVAN",
+      "name": "Evansburg",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 53.594514,
+      "lon": -115.008595
+    },
+    {
+      "stationId": "EDSN",
+      "name": "Edson",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 53.579558,
+      "lon": -116.430566
+    },
+    {
+      "stationId": "HINT",
+      "name": "Hinton",
+      "city": "",
+      "state": "",
+      "tz": "America/Edmonton",
+      "lat": 53.4005,
+      "lon": -117.590048
+    },
+    {
+      "stationId": "VLMT",
+      "name": "Valemount",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 52.8348571623,
+      "lon": -119.26169207
+    },
+    {
+      "stationId": "BLUE",
+      "name": "Blue River",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 52.105382,
+      "lon": -119.300439
+    },
+    {
+      "stationId": "CLWT",
+      "name": "Clearwater",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 51.63789,
+      "lon": -120.033379
+    },
+    {
+      "stationId": "KAMN",
+      "name": "Kamloops North",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 50.718257,
+      "lon": -120.3484611
+    },
+    {
+      "stationId": "ASHN",
+      "name": "Ashcroft",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 50.730397,
+      "lon": -121.26929
+    },
+    {
+      "stationId": "BBAR",
+      "name": "Boston Bar",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.86938,
+      "lon": -121.444652
+    },
+    {
+      "stationId": "HOPE",
+      "name": "Hope",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.3789211444,
+      "lon": -121.436475571
+    },
+    {
+      "stationId": "CHIL",
+      "name": "Chilliwack",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.1639564067,
+      "lon": -121.951861453
+    },
+    {
+      "stationId": "ABBO",
+      "name": "Abbotsford",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.116845,
+      "lon": -122.277756
+    },
+    {
+      "stationId": "MSNH",
+      "name": "Mission Harbour",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.1284044691,
+      "lon": -122.303479458
+    },
+    {
+      "stationId": "AGAS",
+      "name": "Agassiz",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.239552,
+      "lon": -121.764238
+    },
+    {
+      "stationId": "KATZ",
+      "name": "Katz",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.3686134626,
+      "lon": -121.551229101
+    },
+    {
+      "stationId": "NBND",
+      "name": "North Bend",
+      "city": "",
+      "state": "",
+      "tz": "America/Vancouver",
+      "lat": 49.876867,
+      "lon": -121.449673
+    },
+    {
+      "stationId": "PARS",
+      "name": "Parry Sound",
+      "city": "",
+      "state": "",
+      "tz": "America/Toronto",
+      "lat": 45.3507602837,
+      "lon": -80.037136248
+    },
+    {
+      "stationId": "GCN",
+      "name": "Grand Canyon",
+      "city": "Grand Canyon Village",
+      "state": "AZ",
+      "tz": "America/Phoenix",
+      "lat": 36.056867,
+      "lon": -112.136845
+    },
+    {
+      "stationId": "NWB",
+      "name": "Unknown",
+      "city": "New Bedford",
+      "state": "MA",
+      "tz": null,
+      "lat": 41.636026,
+      "lon": -70.927564
+    },
+    {
+      "stationId": "WMA",
+      "name": "Williams",
+      "city": "Williams",
+      "state": "AZ",
+      "tz": "America/Phoenix",
+      "lat": 35.25195,
+      "lon": -112.190106
     }
   ]
 }

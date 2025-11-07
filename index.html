@@ -329,6 +329,15 @@
                                     <input type="checkbox" id="show-bus-live">
                                 </td>
                             </tr>
+                            <tr>
+                                <td style="padding: 5px; font-size: 12px;">Silver Line</td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-silver-line-paths">
+                                </td>
+                                <td style="text-align: center; padding: 5px;">
+                                    <input type="checkbox" id="show-silver-line-live">
+                                </td>
+                            </tr>
                             <tr id="bus-loading-indicator" style="display: none;">
                                 <td colspan="3" style="padding: 5px; font-size: 11px; text-align: center; color: #007bff;">
                                     <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
@@ -388,6 +397,9 @@
     
     <!-- Include the MBTA ferry data -->
     <script src="mbta-ferry-data.js"></script>
+    
+    <!-- Include the Silver Line data -->
+    <script src="mbta-silver-line-data.js"></script>
 
     <script>
         // Global variables - declare these first
@@ -396,6 +408,8 @@
         const amtrakMarkers = new Map();
         const busMarkers = new Map();
         const shuttleMarkers = new Map();
+        const busStopMarkers = new Map(); // Track bus stop markers for zoom control
+        const silverLineStopMarkers = new Map(); // Track Silver Line stop markers for zoom control
         let trackingInterval;
         let ferryTrackingInterval;
         let amtrakTrackingInterval;
@@ -417,6 +431,13 @@
         // Shuttle route loading state
         let shuttleRoutesLoaded = false;
         let shuttleRoutesLoading = false;
+        
+        // Silver Line loading state
+        let silverLineLoaded = false;
+        let silverLineLoading = false;
+        
+        // Bus stop visibility threshold
+        const BUS_STOP_MIN_ZOOM = 14;
         
         // Check if data is ready before proceeding
         if (typeof mbtaStopsData === 'undefined' || !mbtaStopsData) {
@@ -443,6 +464,16 @@
         map.on('click', function(e) {
             if (highlightedLine !== null) {
                 resetHighlight();
+            }
+        });
+        
+        // Add zoom handler to control bus and Silver Line stop visibility
+        map.on('zoomend', function() {
+            if (busRoutesLoaded) {
+                updateBusStopVisibility();
+            }
+            if (silverLineLoaded) {
+                updateSilverLineStopVisibility();
             }
         });
         
@@ -478,6 +509,18 @@
         if (mbtaShuttleData && typeof mbtaShuttleData === 'object') {
             try {
                 Object.keys(mbtaShuttleData).forEach(lineName => {
+                    layers[lineName] = L.layerGroup();
+                    // Don't add to map yet - wait for checkbox
+                });
+            } catch (e) {
+                // Silently handle any errors
+            }
+        }
+        
+        // Initialize layers for Silver Line routes
+        if (typeof silverLineData !== 'undefined' && silverLineData && typeof silverLineData === 'object') {
+            try {
+                Object.keys(silverLineData).forEach(lineName => {
                     layers[lineName] = L.layerGroup();
                     // Don't add to map yet - wait for checkbox
                 });
@@ -707,9 +750,15 @@
         document.getElementById('show-bus-live').addEventListener('change', function() {
             const isChecked = this.checked;
             
-            // Hide/show bus markers
+            // Hide/show bus markers (but not Silver Line - they have their own checkbox)
+            const silverLineRoutes = ['741', '742', '743', '749', '751', '746'];
             busMarkers.forEach((marker, busId) => {
                 if (marker) {
+                    // Skip Silver Line vehicles - they have their own checkbox
+                    if (marker.apiRouteId && silverLineRoutes.includes(marker.apiRouteId)) {
+                        return;
+                    }
+                    
                     if (isChecked) {
                         marker.addTo(map);
                     } else {
@@ -794,6 +843,69 @@
                 
                 // If no categories are checked, stop live tracking
                 if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasFerry && !hasAmtrak) {
+                    stopLiveTracking();
+                }
+            }
+            
+            updateStats();
+        });
+        
+        // Silver Line paths filter
+        document.getElementById('show-silver-line-paths').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            if (typeof silverLineData !== 'undefined' && silverLineData && typeof silverLineData === 'object') {
+                if (isChecked) {
+                    // Load Silver Line routes when checkbox is enabled
+                    loadSilverLine(true);
+                } else {
+                    // Hide all Silver Line route layers
+                    Object.keys(silverLineData).forEach(lineName => {
+                        if (layers[lineName]) {
+                            map.removeLayer(layers[lineName]);
+                        }
+                    });
+                }
+            }
+            updateStats();
+        });
+        
+        // Silver Line live tracking filter
+        document.getElementById('show-silver-line-live').addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // Show/hide Silver Line vehicle markers
+            // Silver Line vehicles are in busMarkers but need separate filtering
+            const silverLineRoutes = ['741', '742', '743', '749', '751', '746'];
+            busMarkers.forEach((marker, vehicleId) => {
+                // Check if this marker is a Silver Line vehicle using API route ID
+                if (marker && marker.apiRouteId && silverLineRoutes.includes(marker.apiRouteId)) {
+                    if (isChecked) {
+                        marker.addTo(map);
+                    } else {
+                        marker.remove();
+                    }
+                }
+            });
+            
+            // Control live tracking
+            if (isChecked) {
+                // Resume live tracking if it was stopped
+                if (!trackingInterval) {
+                    startLiveTracking();
+                }
+            } else {
+                // Check if any other services are still active for live tracking
+                const hasSubway = document.getElementById('show-subway-live').checked;
+                const hasCommuter = document.getElementById('show-commuter-live').checked;
+                const hasSeasonal = document.getElementById('show-seasonal-live').checked;
+                const hasBus = document.getElementById('show-bus-live').checked;
+                const hasShuttle = document.getElementById('show-shuttle-live').checked;
+                const hasFerry = document.getElementById('show-ferry-live').checked;
+                const hasAmtrak = document.getElementById('show-amtrak-live').checked;
+                
+                // If no categories are checked, stop live tracking
+                if (!hasSubway && !hasCommuter && !hasSeasonal && !hasBus && !hasShuttle && !hasFerry && !hasAmtrak) {
                     stopLiveTracking();
                 }
             }
@@ -978,6 +1090,13 @@
             // Bus routes - all yellow
             '71': '#FFD700',
             '73': '#FFD700',
+            // Silver Line - silver/gray (official MBTA color)
+            'SL1': '#7C878E',
+            'SL2': '#7C878E',
+            'SL3': '#7C878E',
+            'SL4': '#7C878E',
+            'SL5': '#7C878E',
+            'SLW': '#7C878E',
             // Ferry routes - all blue
             'Boat-F4': '#008EAA',
             'Boat-F1': '#008EAA',
@@ -1061,12 +1180,12 @@
                                 Coordinates: ${stop.coords[0].toFixed(6)}, ${stop.coords[1].toFixed(6)}
                             `);
                         } else {
-                            // Set radius based on stop type: bus stops are bigger but still smaller than subway stops
+                            // Set radius based on stop type
                             let radius;
                             if (stop.type === 'Bus' || stop.type === 'Shuttle') {
-                                radius = isMultiLine ? 7 : 5; // Bigger for buses/shuttles
+                                radius = 5; // Bus/shuttle stops
                             } else {
-                                radius = isMultiLine ? 10 : 7; // Subway/rail stops are larger
+                                radius = 7; // Subway/rail stops - all same size
                             }
                             
                             const marker = L.circleMarker(stop.coords, {
@@ -1279,7 +1398,7 @@
             // Stats display was removed - function kept for compatibility
         }
         
-        // Function to load bus routes - SIMPLIFIED (tracks only, no stop markers)
+        // Function to load bus routes with stops (stops visible only when zoomed in)
         function loadBusRoutesChunked(showOnMap = false) {
             if (busRoutesLoaded || busRoutesLoading) {
                 // Already loaded or loading - just show/hide as needed
@@ -1303,7 +1422,7 @@
                 return !mbtaStopsData || !mbtaStopsData[lineName];
             });
             
-            console.log(`Loading ${busRoutes.length} bus routes (tracks only)...`);
+            console.log(`Loading ${busRoutes.length} bus routes with stops...`);
             
             // Show loading indicator
             const loadingIndicator = document.getElementById('bus-loading-indicator');
@@ -1312,7 +1431,7 @@
                 loadingIndicator.style.display = '';
             }
             
-            // Process routes in chunks - ONLY SHOW ROUTE LINES, NOT INDIVIDUAL STOPS
+            // Process routes in chunks with stops
             const CHUNK_SIZE = 20; // Process 20 routes at a time
             let currentIndex = 0;
             
@@ -1324,7 +1443,7 @@
                     const stops = mbtaBusData[lineName];
                     const color = lineColors[lineName] || '#FFD700';
                     
-                    // ONLY render route shapes if available - skip individual stop markers for performance
+                    // Render route shapes if available
                     if (typeof busRouteShapes !== 'undefined' && busRouteShapes[lineName] && busRouteShapes[lineName].length > 0) {
                         busRouteShapes[lineName].forEach((shape, shapeIndex) => {
                             let coords = null;
@@ -1342,14 +1461,81 @@
                                 const trackLine = L.polyline(coords, {
                                     color: color,
                                     weight: 4,
-                                    opacity: 0.5
+                                    opacity: 1.0
                                 });
                                 trackLine.bindPopup(`<b>Bus Route ${lineName}</b>`);
                                 layers[lineName].addLayer(trackLine);
                             }
                         });
                     }
-                    // If no route shapes, don't draw any fallback lines
+                    
+                    // Add bus stop markers (visible only when zoomed in)
+                    if (stops && Array.isArray(stops)) {
+                        // Check current zoom to set initial visibility
+                        const currentZoom = map.getZoom();
+                        const initiallyVisible = currentZoom >= BUS_STOP_MIN_ZOOM;
+                        
+                        stops.forEach(stop => {
+                            // Create unique stop ID for tracking
+                            const stopKey = `${lineName}-${stop.name}-${stop.coords[0]}-${stop.coords[1]}`;
+                            
+                        // Create circle marker for bus stop
+                        const marker = L.circleMarker(stop.coords, {
+                            radius: 4,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 1.5,
+                            opacity: initiallyVisible ? 1 : 0,
+                            fillOpacity: initiallyVisible ? 0.8 : 0,
+                            interactive: true,
+                            bubblingMouseEvents: false
+                        });
+                        
+                        // Mark as bus stop for efficient checking during highlight
+                        marker.isBusStop = true;
+                            
+                            // Create tooltip content
+                            const tooltipContent = `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0;">
+                                <b>${stop.name}</b><br>
+                                Type: Bus Stop<br>
+                                Route: ${lineName}<br>
+                                Coordinates: ${stop.coords[0].toFixed(6)}, ${stop.coords[1].toFixed(6)}
+                            </div>`;
+                            
+                            // Use tooltip, direction based on latitude
+                            const tooltipDirection = stop.coords[0] < 42.361220 ? 'bottom' : 'top';
+                            marker.bindTooltip(tooltipContent, { 
+                                direction: tooltipDirection,
+                                permanent: false,
+                                interactive: true,
+                                className: 'custom-tooltip'
+                            });
+                            
+                            // Add click handler to highlight route
+                            marker.on('click', function(e) {
+                                // Prevent map click from firing
+                                L.DomEvent.stopPropagation(e);
+                                
+                                // Check if this route is already highlighted
+                                const alreadyHighlighted = highlightedLine === lineName;
+                                
+                                // If clicking the same route, reset; otherwise highlight
+                                if (alreadyHighlighted) {
+                                    resetHighlight();
+                                } else {
+                                    highlightMultipleLines([lineName]);
+                                }
+                            });
+                            
+                            // Add to layer (in same layer as route paths)
+                            layers[lineName].addLayer(marker);
+                            
+                            // Track marker for zoom control
+                            if (!busStopMarkers.has(stopKey)) {
+                                busStopMarkers.set(stopKey, marker);
+                            }
+                        });
+                    }
                     
                     // Add to map if requested
                     if (showOnMap && layers[lineName]) {
@@ -1379,12 +1565,38 @@
                         loadingIndicator.style.display = 'none';
                     }
                     
-                    console.log('Bus route tracks loaded successfully (stop markers hidden for performance)');
+                    console.log('Bus routes and stops loaded successfully');
+                    
+                    // Update bus stop visibility based on current zoom
+                    updateBusStopVisibility();
                 }
             };
             
             // Start processing
             processChunk();
+        }
+        
+        // Function to update bus stop visibility based on zoom level
+        function updateBusStopVisibility() {
+            const currentZoom = map.getZoom();
+            const shouldShowByZoom = currentZoom >= BUS_STOP_MIN_ZOOM;
+            
+            busStopMarkers.forEach((marker, stopKey) => {
+                // Extract route name from stop key (format: "lineName-stopName-lat-lng")
+                const lineName = stopKey.split('-')[0];
+                
+                // Check if this stop's route is highlighted (dimmed by another highlight)
+                const isDimmed = highlightedLine !== null && (
+                    Array.isArray(highlightedLine) ? !highlightedLine.includes(lineName) : highlightedLine !== lineName
+                );
+                
+                // Only show if zoom allows AND not dimmed by highlight
+                if (shouldShowByZoom && !isDimmed) {
+                    marker.setStyle({ opacity: 1, fillOpacity: 0.8 });
+                } else {
+                    marker.setStyle({ opacity: 0, fillOpacity: 0 });
+                }
+            });
         }
         
         // Function to load shuttle routes - similar to bus routes
@@ -1433,8 +1645,8 @@
                         if (coords && coords.length > 1) {
                             const trackLine = L.polyline(coords, {
                                 color: color,
-                                weight: 4,
-                                opacity: 0.5
+                                weight: 5,
+                                opacity: 1.0
                             });
                             trackLine.bindPopup(`<b>Shuttle ${lineName}</b>`);
                             layers[lineName].addLayer(trackLine);
@@ -1452,6 +1664,168 @@
             shuttleRoutesLoading = false;
             
             console.log('Shuttle routes loaded successfully');
+        }
+        
+        // Function to load Silver Line routes with stops (stops visible only when zoomed in)
+        function loadSilverLine(showOnMap = false) {
+            if (typeof silverLineData === 'undefined') {
+                console.log('Silver Line data not loaded');
+                return;
+            }
+            
+            if (silverLineLoaded || silverLineLoading) {
+                // Already loaded or loading - just show/hide as needed
+                if (silverLineLoaded) {
+                    Object.keys(silverLineData).forEach(lineName => {
+                        if (layers[lineName]) {
+                            if (showOnMap) {
+                                map.addLayer(layers[lineName]);
+                            } else {
+                                map.removeLayer(layers[lineName]);
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+            
+            silverLineLoading = true;
+            const silverRoutes = Object.keys(silverLineData);
+            
+            console.log(`Loading ${silverRoutes.length} Silver Line routes with stops...`);
+            
+            // Process routes
+            const currentZoom = map.getZoom();
+            const initiallyVisible = currentZoom >= BUS_STOP_MIN_ZOOM;
+            
+            for (let i = 0; i < silverRoutes.length; i++) {
+                const lineName = silverRoutes[i];
+                const stops = silverLineData[lineName];
+                const color = lineColors[lineName] || '#7C878E'; // Silver Line color
+                
+                // Render route shapes if available
+                if (typeof silverLineShapes !== 'undefined' && silverLineShapes[lineName] && silverLineShapes[lineName].length > 0) {
+                    silverLineShapes[lineName].forEach((shape, shapeIndex) => {
+                        let coords = null;
+                        
+                        // Handle coordinate array format
+                        if (shape.coords && Array.isArray(shape.coords)) {
+                            coords = shape.coords;
+                        }
+                        
+                        if (coords && coords.length > 1) {
+                            const trackLine = L.polyline(coords, {
+                                color: color,
+                                weight: 4,
+                                opacity: 1.0
+                            });
+                            trackLine.bindPopup(`<b>Silver Line ${lineName}</b>`);
+                            layers[lineName].addLayer(trackLine);
+                        }
+                    });
+                }
+                
+                // Add stop markers (visible only when zoomed in)
+                if (stops && Array.isArray(stops)) {
+                    stops.forEach(stop => {
+                        // Create unique stop ID for tracking
+                        const stopKey = `${lineName}-${stop.name}-${stop.coords[0]}-${stop.coords[1]}`;
+                        
+                        // Create circle marker for Silver Line stop
+                        const marker = L.circleMarker(stop.coords, {
+                            radius: 5,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 1.5,
+                            opacity: initiallyVisible ? 1 : 0,
+                            fillOpacity: initiallyVisible ? 0.8 : 0,
+                            interactive: true,
+                            bubblingMouseEvents: false
+                        });
+                        
+                        // Mark as Silver Line stop (also a bus stop) for efficient checking
+                        marker.isSilverLineStop = true;
+                        marker.isBusStop = true;
+                        
+                        // Create tooltip content
+                        const tooltipContent = `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0;">
+                            <b>${stop.name}</b><br>
+                            Type: Silver Line Stop<br>
+                            Route: ${lineName}<br>
+                            Coordinates: ${stop.coords[0].toFixed(6)}, ${stop.coords[1].toFixed(6)}
+                        </div>`;
+                        
+                        // Use tooltip, direction based on latitude
+                        const tooltipDirection = stop.coords[0] < 42.361220 ? 'bottom' : 'top';
+                        marker.bindTooltip(tooltipContent, { 
+                            direction: tooltipDirection,
+                            permanent: false,
+                            interactive: true,
+                            className: 'custom-tooltip'
+                        });
+                        
+                        // Add click handler to highlight route
+                        marker.on('click', function(e) {
+                            // Prevent map click from firing
+                            L.DomEvent.stopPropagation(e);
+                            
+                            // Check if this route is already highlighted
+                            const alreadyHighlighted = highlightedLine === lineName;
+                            
+                            // If clicking the same route, reset; otherwise highlight
+                            if (alreadyHighlighted) {
+                                resetHighlight();
+                            } else {
+                                highlightMultipleLines([lineName]);
+                            }
+                        });
+                        
+                        // Add to layer (in same layer as route paths)
+                        layers[lineName].addLayer(marker);
+                        
+                        // Track marker for zoom control
+                        if (!silverLineStopMarkers.has(stopKey)) {
+                            silverLineStopMarkers.set(stopKey, marker);
+                        }
+                    });
+                }
+                
+                // Add to map if requested
+                if (showOnMap && layers[lineName]) {
+                    layers[lineName].addTo(map);
+                }
+            }
+            
+            silverLineLoaded = true;
+            silverLineLoading = false;
+            
+            console.log('Silver Line routes and stops loaded successfully');
+            
+            // Update Silver Line stop visibility based on current zoom
+            updateSilverLineStopVisibility();
+        }
+        
+        // Function to update Silver Line stop visibility based on zoom level
+        function updateSilverLineStopVisibility() {
+            const currentZoom = map.getZoom();
+            const shouldShowByZoom = currentZoom >= BUS_STOP_MIN_ZOOM;
+            
+            silverLineStopMarkers.forEach((marker, stopKey) => {
+                // Extract route name from stop key (format: "lineName-stopName-lat-lng")
+                const lineName = stopKey.split('-')[0];
+                
+                // Check if this stop's route is highlighted (dimmed by another highlight)
+                const isDimmed = highlightedLine !== null && (
+                    Array.isArray(highlightedLine) ? !highlightedLine.includes(lineName) : highlightedLine !== lineName
+                );
+                
+                // Only show if zoom allows AND not dimmed by highlight
+                if (shouldShowByZoom && !isDimmed) {
+                    marker.setStyle({ opacity: 1, fillOpacity: 0.8 });
+                } else {
+                    marker.setStyle({ opacity: 0, fillOpacity: 0 });
+                }
+            });
         }
         
         // Helper function to check if a line is currently highlighted
@@ -1477,9 +1851,18 @@
                 }
             });
             
+            // Check if any of the highlighted lines are shuttles
+            const highlightingShuttle = lineNames.some(name => 
+                typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[name]
+            );
+            
             // Iterate through all layers and adjust opacity
             Object.keys(layers).forEach(layerName => {
-                const isDimmed = !lineNames.includes(layerName);
+                // If highlighting a shuttle, don't dim other shuttles
+                const isShuttle = typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[layerName];
+                const shouldSkipDim = highlightingShuttle && isShuttle;
+                
+                const isDimmed = !lineNames.includes(layerName) && !shouldSkipDim;
                 
                 layers[layerName].eachLayer(layer => {
                     if (layer.setStyle) {
@@ -1497,8 +1880,21 @@
                                 layer.options._originalOpacity = layer.options.opacity || 1.0;
                                 layer.options._originalFillOpacity = layer.options.fillOpacity || 0.8;
                             }
-                            const targetOpacity = isDimmed ? 0 : layer.options._originalOpacity;
-                            const targetFillOpacity = isDimmed ? 0 : layer.options._originalFillOpacity;
+                            
+                            // Check if this is a bus stop and if it should be visible based on zoom
+                            const isBusStop = layer.isBusStop === true;
+                            const currentZoom = map.getZoom();
+                            const shouldBeVisibleByZoom = !isBusStop || currentZoom >= BUS_STOP_MIN_ZOOM;
+                            
+                            let targetOpacity, targetFillOpacity;
+                            if (isDimmed || !shouldBeVisibleByZoom) {
+                                targetOpacity = 0;
+                                targetFillOpacity = 0;
+                            } else {
+                                targetOpacity = layer.options._originalOpacity;
+                                targetFillOpacity = layer.options._originalFillOpacity;
+                            }
+                            
                             layer.setStyle({ 
                                 opacity: targetOpacity,
                                 fillOpacity: targetFillOpacity 
@@ -1545,9 +1941,10 @@
             });
             
             // Dim/highlight live shuttle markers
+            // If highlighting a shuttle, keep all shuttles visible
             shuttleMarkers.forEach((marker, shuttleId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = !lineNames.includes(marker.routeName);
+                    const isDimmed = !lineNames.includes(marker.routeName) && !highlightingShuttle;
                     const targetOpacity = isDimmed ? 0 : 1.0;
                     
                     if (marker.setOpacity) {
@@ -1610,6 +2007,19 @@
         
         // Function to highlight a specific line and dim all others
         function highlightLine(lineName) {
+            // Check if this is an Amtrak route and if Amtrak routes are loaded
+            const isAmtrakRoute = !layers[lineName]; // If not in MBTA layers, assume it's Amtrak
+            if (isAmtrakRoute) {
+                // Check if any Amtrak routes are loaded
+                const hasAmtrakRoutes = (window.amtrakRouteLayerGroup && window.amtrakRouteLayerGroup.getLayers().length > 0) ||
+                                       (window.amtrakRouteLayers && Object.keys(window.amtrakRouteLayers).length > 0);
+                
+                if (!hasAmtrakRoutes) {
+                    console.log('Cannot highlight Amtrak route - no Amtrak routes loaded. Enable "Amtrak Paths" first.');
+                    return; // Don't highlight if no Amtrak routes are loaded
+                }
+            }
+            
             highlightedLine = lineName;
             
             // Ensure the highlighted line layer is on the map
@@ -1617,9 +2027,16 @@
                 map.addLayer(layers[lineName]);
             }
             
+            // Check if the highlighted line is a shuttle
+            const highlightingShuttle = typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[lineName];
+            
             // Iterate through all layers and adjust opacity
             Object.keys(layers).forEach(layerName => {
-                const isDimmed = layerName !== lineName;
+                // If highlighting a shuttle, don't dim other shuttles
+                const isShuttle = typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[layerName];
+                const shouldSkipDim = highlightingShuttle && isShuttle;
+                
+                const isDimmed = layerName !== lineName && !shouldSkipDim;
                 
                 layers[layerName].eachLayer(layer => {
                     if (layer.setStyle) {
@@ -1685,9 +2102,10 @@
             });
             
             // Dim/highlight live shuttle markers
+            // If highlighting a shuttle, keep all shuttles visible
             shuttleMarkers.forEach((marker, shuttleId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = marker.routeName !== lineName;
+                    const isDimmed = marker.routeName !== lineName && !highlightingShuttle;
                     const targetOpacity = isDimmed ? 0 : 1.0;
                     
                     if (marker.setOpacity) {
@@ -1706,8 +2124,11 @@
             // Dim/highlight Amtrak route tracks (from layer group)
             if (window.amtrakRouteLayerGroup) {
                 window.amtrakRouteLayerGroup.eachLayer(polyline => {
-                    if (polyline && polyline.routeName && polyline.setStyle) {
-                        const isDimmed = polyline.routeName !== lineName;
+                    if (polyline && polyline.setStyle) {
+                        // Check if this polyline has a routeName and if it matches
+                        const hasRouteName = polyline.routeName;
+                        const isDimmed = hasRouteName ? polyline.routeName !== lineName : false;
+                        
                         if (!polyline.options._originalOpacity) {
                             polyline.options._originalOpacity = polyline.options.opacity || 0.8;
                         }
@@ -1720,8 +2141,11 @@
             // Also handle Amtrak routes loaded from API (stored in amtrakRouteLayers)
             if (window.amtrakRouteLayers) {
                 Object.values(window.amtrakRouteLayers).forEach(polyline => {
-                    if (polyline && polyline.routeName && polyline.setStyle) {
-                        const isDimmed = polyline.routeName !== lineName;
+                    if (polyline && polyline.setStyle) {
+                        // Check if this polyline has a routeName and if it matches
+                        const hasRouteName = polyline.routeName;
+                        const isDimmed = hasRouteName ? polyline.routeName !== lineName : false;
+                        
                         if (!polyline.options._originalOpacity) {
                             polyline.options._originalOpacity = polyline.options.opacity || 0.8;
                         }
@@ -1761,12 +2185,18 @@
                             const originalOpacity = layer.options._originalOpacity || 0.7;
                             layer.setStyle({ opacity: originalOpacity });
                         } else if (layer instanceof L.CircleMarker) {
-                            // Reset stop marker opacity to original values
+                            // Check if this is a bus stop and if it should be visible based on zoom
+                            const isBusStop = layer.isBusStop === true;
+                            const currentZoom = map.getZoom();
+                            const shouldBeVisibleByZoom = !isBusStop || currentZoom >= BUS_STOP_MIN_ZOOM;
+                            
+                            // Reset stop marker opacity to original values, but respect zoom visibility
                             const originalOpacity = layer.options._originalOpacity || 1.0;
                             const originalFillOpacity = layer.options._originalFillOpacity || 0.8;
+                            
                             layer.setStyle({ 
-                                opacity: originalOpacity,
-                                fillOpacity: originalFillOpacity 
+                                opacity: shouldBeVisibleByZoom ? originalOpacity : 0,
+                                fillOpacity: shouldBeVisibleByZoom ? originalFillOpacity : 0
                             });
                         }
                     }
@@ -1782,6 +2212,12 @@
                 // Check if this is a shuttle route
                 else if (typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[layerName]) {
                     if (!document.getElementById('show-shuttle-paths').checked) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                }
+                // Check if this is a Silver Line route
+                else if (typeof silverLineData !== 'undefined' && silverLineData[layerName]) {
+                    if (!document.getElementById('show-silver-line-paths').checked) {
                         map.removeLayer(layers[layerName]);
                     }
                 }
@@ -2240,6 +2676,10 @@
                         if (isLineHighlighted(routeName)) {
                             resetHighlight();
                         } else {
+                            // Load Amtrak routes if not loaded yet (so they can be highlighted)
+                            if (!window.amtrakRoutesLoaded && document.getElementById('show-amtrak-paths').checked) {
+                                loadAmtrakRoutes();
+                            }
                             highlightLine(routeName);
                         }
                     });
@@ -3110,25 +3550,77 @@
                         (typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[routeId])
                     );
                     
-                    // Get route name and color
-                    let routeName = isShuttle ? 'Unknown Shuttle' : 'Unknown Bus Route';
-                    let color = isShuttle ? '#FF6B6B' : '#FFD700'; // Shuttle red or bus gold
-                    let vehicleType = isShuttle ? 'Shuttle' : 'Bus';
+                    // Check if this is a Silver Line vehicle (route IDs: 741, 742, 743, 749, 751, 746)
+                    const silverLineRoutes = ['741', '742', '743', '749', '751', '746'];
+                    const isSilverLine = routeId && silverLineRoutes.includes(routeId);
+                    
+                    // Determine vehicle type and default colors
+                    let vehicleType, color;
+                    if (isSilverLine) {
+                        vehicleType = 'Silver Line';
+                        color = '#7C878E'; // Silver Line color
+                    } else if (isShuttle) {
+                        vehicleType = 'Shuttle';
+                        color = '#FF6B6B'; // Shuttle red
+                    } else {
+                        vehicleType = 'Bus';
+                        color = '#FFD700'; // Bus gold
+                    }
+                    
+                    // Get route name
+                    let routeName = `Unknown ${vehicleType} Route`;
                     
                     if (routeId) {
-                        // Always show the route ID from the API
-                        routeName = isShuttle ? `Shuttle ${routeId}` : `Bus Route ${routeId}`;
-                        color = lineColors[routeId] || color;
+                        // Get proper route name based on vehicle type
+                        if (isSilverLine) {
+                            // Map Silver Line route IDs to their display names
+                            const silverLineNames = {
+                                '741': 'SL1',
+                                '742': 'SL2',
+                                '743': 'SL3',
+                                '751': 'SL4',
+                                '749': 'SL5',
+                                '746': 'SLW'
+                            };
+                            const slName = silverLineNames[routeId] || routeId;
+                            routeName = `Silver Line ${slName}`;
+                            color = lineColors[slName] || color;
+                        } else if (isShuttle) {
+                            routeName = `Shuttle ${routeId}`;
+                            color = lineColors[routeId] || color;
+                        } else {
+                            routeName = `Bus Route ${routeId}`;
+                            color = lineColors[routeId] || color;
+                        }
                         
                         // Ensure this route has a layer (create one if it doesn't exist)
-                        if (!layers[routeId]) {
-                            layers[routeId] = L.layerGroup();
+                        // For Silver Line, we need to use the display name as the layer key
+                        let layerKey = routeId;
+                        if (isSilverLine) {
+                            const silverLineNames = {
+                                '741': 'SL1',
+                                '742': 'SL2',
+                                '743': 'SL3',
+                                '751': 'SL4',
+                                '749': 'SL5',
+                                '746': 'SLW'
+                            };
+                            layerKey = silverLineNames[routeId] || routeId;
+                        }
+                        
+                        if (!layers[layerKey]) {
+                            layers[layerKey] = L.layerGroup();
                         }
                     }
                     
-                    // Create marker with appropriate icon
+                    // Create marker with appropriate icon based on vehicle type
+                    let iconUrl = 'icons/buscirc.png'; // Default to bus icon
+                    if (isSilverLine) {
+                        iconUrl = 'icons/silverlinecirc.png';
+                    }
+                    
                     const vehicleIcon = L.icon({
-                        iconUrl: 'icons/buscirc.png',
+                        iconUrl: iconUrl,
                         iconSize: [20, 20],
                         iconAnchor: [10, 10]
                     });
@@ -3192,18 +3684,38 @@
                         className: 'custom-tooltip'
                     });
                     
-                    // Store route name with marker for filtering (use routeId for matching with layers)
-                    vehicleMarker.routeName = routeId; // Use routeId instead of formatted name for layer matching
+                    // Store route name with marker for filtering
+                    // For Silver Line, use display name (SL1, SL2, etc.) to match layer keys
+                    // For others, use routeId
+                    let markerRouteKey = routeId;
+                    if (isSilverLine) {
+                        const silverLineNames = {
+                            '741': 'SL1',
+                            '742': 'SL2',
+                            '743': 'SL3',
+                            '751': 'SL4',
+                            '749': 'SL5',
+                            '746': 'SLW'
+                        };
+                        markerRouteKey = silverLineNames[routeId] || routeId;
+                    }
+                    
+                    vehicleMarker.routeName = markerRouteKey; // Use for layer matching
+                    vehicleMarker.apiRouteId = routeId; // Store API route ID for filtering
                     vehicleMarker.displayName = routeName; // Keep formatted name for display
                     
                     // Add click handler to highlight the route
                     vehicleMarker.on('click', function() {
                         // If this route is already highlighted, reset; otherwise highlight it
-                        if (isLineHighlighted(routeId)) {
+                        if (isLineHighlighted(markerRouteKey)) {
                             resetHighlight();
                         } else {
                             // Ensure routes are loaded before highlighting
-                            if (isShuttle) {
+                            if (isSilverLine) {
+                                if (!silverLineLoaded && document.getElementById('show-silver-line-paths').checked) {
+                                    loadSilverLine(true);
+                                }
+                            } else if (isShuttle) {
                                 if (!shuttleRoutesLoaded && document.getElementById('show-shuttle-paths').checked) {
                                     loadShuttleRoutesChunked(true);
                                 }
@@ -3214,12 +3726,31 @@
                             }
                             
                             // Always highlight the route (layer will be created even if empty)
-                            highlightLine(routeId);
+                            highlightLine(markerRouteKey);
                         }
                     });
                     
                     // Add to map and store reference based on vehicle type
-                    if (isShuttle) {
+                    if (isSilverLine) {
+                        // Add to map if Silver Line live tracking checkbox is checked
+                        if (document.getElementById('show-silver-line-live').checked) {
+                            vehicleMarker.addTo(map);
+                        }
+                        
+                        // Apply highlight opacity if a line is currently highlighted
+                        if (highlightedLine !== null) {
+                            const shouldDim = Array.isArray(highlightedLine) 
+                                ? !highlightedLine.includes(markerRouteKey)
+                                : highlightedLine !== markerRouteKey;
+                            
+                            if (shouldDim) {
+                                vehicleMarker.setOpacity(0);
+                            }
+                        }
+                        
+                        // Store in busMarkers (Silver Line uses bus API)
+                        busMarkers.set(vehicleId, vehicleMarker);
+                    } else if (isShuttle) {
                         // Add to map if shuttle live tracking checkbox is checked
                         if (document.getElementById('show-shuttle-live').checked) {
                             vehicleMarker.addTo(map);
