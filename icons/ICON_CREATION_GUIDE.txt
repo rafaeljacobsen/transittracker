@@ -1,0 +1,46 @@
+LIRR ICON CREATION GUIDE
+========================
+
+You need to create: icons/lirrcirc.png
+
+SPECIFICATIONS:
+- Size: 24x24 pixels
+- Format: PNG with transparency
+- Color: Navy blue (#00305E)
+- Border: White outline (2px width)
+- Style: Circular, matching existing transit icons
+
+EXISTING ICONS FOR REFERENCE:
+- amtrakcirc.png
+- commuterrailcirc.png
+- bluelinecirc.png
+- etc.
+
+QUICK METHODS:
+
+1. Copy and Edit:
+   - Duplicate commuterrailcirc.png
+   - Change color to navy blue (#00305E)
+   - Save as lirrcirc.png
+
+2. Use Image Editor (GIMP/Photoshop/Paint.NET):
+   - Create new 24x24px image
+   - Fill with navy blue #00305E
+   - Select circular area
+   - Add white 2px stroke/border
+   - Export as PNG
+
+3. Online Tools:
+   - favicon.io - Create custom icons
+   - canva.com - Free icon maker
+   - pixlr.com - Online photo editor
+
+4. Command Line (ImageMagick):
+   convert -size 24x24 xc:none -fill "#00305E" -draw "circle 12,12 12,2" -stroke white -strokewidth 2 -draw "circle 12,12 12,2" lirrcirc.png
+
+PLACEMENT:
+Save the file as: icons/lirrcirc.png
+
+The icon will be used for live LIRR train markers on the map.
+
+

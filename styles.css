@@ -1,0 +1,253 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+#map {
+    height: 100vh;
+    width: 100%;
+}
+
+.info-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    z-index: 1000;
+    width: 180px;
+    max-height: none;
+    overflow: hidden;
+}
+
+.info-panel h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.info-panel p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.coordinates {
+    font-family: monospace;
+    background: #f5f5f5;
+    padding: 8px;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-size: 12px;
+}
+
+.filter-controls {
+    margin: 8px 0;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 0 10px 0;
+}
+
+.filter-controls h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #555;
+}
+
+.lines-toggle {
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.lines-toggle:hover {
+    background: #0056b3;
+}
+
+.lines-toggle.collapsed {
+    transform: rotate(180deg);
+}
+
+.category-filters {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.category-filters.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.filter-checkbox {
+    margin: 4px 0;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    height: 20px;
+}
+
+.filter-checkbox input {
+    margin-right: 8px;
+    margin: 0;
+}
+
+.filter-checkbox label {
+    margin: 0;
+    line-height: 1;
+}
+
+.stats {
+    background: #e9ecef;
+    padding: 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 12px;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px 6px 10px;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+    border-radius: 8px 8px 0 0;
+}
+
+.panel-header h3, .panel-header h4 {
+    margin: 0;
+    color: #333;
+}
+
+.panel-toggle {
+    position: absolute;
+    right: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    width: 30px;
+    height: 60px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 1001;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.4);
+}
+
+.panel-toggle:hover {
+    background: #0056b3;
+    width: 25px;
+}
+
+.panel-content {
+    padding: 10px;
+    max-height: none;
+    overflow-y: visible;
+}
+
+.panel-hidden {
+    transform: translateX(-100%);
+}
+
+.panel-hidden .panel-toggle {
+    right: -20px;
+    background: #666;
+}
+
+.info-panel {
+    transition: transform 0.3s ease;
+}
+
+.search-box {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    z-index: 1000;
+    width: 250px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.search-results {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.search-result {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.search-result:hover {
+    background: #f5f5f5;
+}
+
+/* Custom tooltip styling to look like popups */
+.custom-tooltip.leaflet-tooltip {
+    background-color: white;
+    border: 2px solid #ccc;
+    border-radius: 12px;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+    padding: 8px;
+    font-family: inherit;
+    max-width: 320px;
+    min-width: 150px;
+    width: max-content;
+    height: auto !important;
+    max-height: none !important;
+    white-space: normal !important;
+}
+
+/* Arrow styling for tooltips - make arrows white based on direction */
+.custom-tooltip.leaflet-tooltip-top::before {
+    border-top-color: white !important;  /* Arrow pointing up (tooltip above marker) */
+}
+
+.custom-tooltip.leaflet-tooltip-bottom::before {
+    border-bottom-color: white !important;  /* Arrow pointing down (tooltip below marker) */
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
