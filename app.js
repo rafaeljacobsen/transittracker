@@ -3622,8 +3622,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const buffer = await response.arrayBuffer();
                 
-                // Load GTFS-RT proto definition
-                const root = await protobuf.load('https://raw.githubusercontent.com/google/transit/master/gtfs-realtime/proto/gtfs-realtime.proto');
+                // Load GTFS-RT proto definition (use local file to avoid GitHub Pages URL resolution issues)
+                const root = await protobuf.load('./gtfs-realtime.proto');
                 const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
                 
                 // Decode the protobuf
