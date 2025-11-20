@@ -53,28 +53,17 @@ def load_gtfs_data():
         print("Error: trips.txt not found in GTFS directory")
         return None, None, None
     
-    trips_df = pd.read_csv(trips_file)
+    # Force shape_id to be read as string to preserve leading zeros
+    trips_df = pd.read_csv(trips_file, dtype={'shape_id': str})
     print(f"Loaded {len(trips_df)} trips from GTFS")
     
     # Load shapes (optional)
     shapes_file = gtfs_dir / "shapes.txt"
     shapes_df = None
     if shapes_file.exists():
-        shapes_df = pd.read_csv(shapes_file)
+        # Force shape_id to be read as string to preserve leading zeros
+        shapes_df = pd.read_csv(shapes_file, dtype={'shape_id': str})
         print(f"Loaded {len(shapes_df)} shape points from GTFS")
-        
-        # Normalize shape_id column (convert float 1160130.0 -> string '1160130')
-        def normalize_shape_id(val):
-            try:
-                if isinstance(val, float) and not pd.isna(val):
-                    return str(int(val))
-                return str(val)
-            except:
-                return str(val)
-        
-        print("Normalizing shape IDs...")
-        shapes_df['shape_id'] = shapes_df['shape_id'].apply(normalize_shape_id)
-        print("Shape IDs normalized")
     
     return routes_df, stops_df, stop_times_df, trips_df, shapes_df
 
@@ -135,26 +124,17 @@ def get_route_shapes(route_id, trips_df, shapes_df):
     # Get trips for this route - convert route_id column to string for comparison
     route_trips = trips_df[trips_df['route_id'].astype(str) == route_id_str]
     if route_trips.empty:
-        if route_id_str == '116':  # Debug route 116
-            print(f"DEBUG Route 116: No trips found!")
-            print(f"  Sample route_ids in trips: {trips_df['route_id'].head(10).tolist()}")
         return []
     
-    # Get shape IDs and convert to strings
-    shape_ids = route_trips['shape_id'].dropna().astype(str).unique()
+    # Get shape IDs (already strings since we loaded with dtype={'shape_id': str})
+    shape_ids = route_trips['shape_id'].dropna().unique()
     if len(shape_ids) == 0:
-        if route_id_str == '116':  # Debug route 116
-            print(f"DEBUG Route 116: Found {len(route_trips)} trips but no shape IDs!")
         return []
     
-    if route_id_str == '116':  # Debug route 116
-        print(f"DEBUG Route 116: Found {len(route_trips)} trips with {len(shape_ids)} unique shapes")
-        print(f"  Shape IDs: {shape_ids[:5]}")
-    
-    # Get shape data (shape_id is already normalized to string at load time)
+    # Get shape data
     shapes = []
     for shape_id in shape_ids:
-        shape_data = shapes_df[shapes_df['shape_id'] == str(shape_id)]
+        shape_data = shapes_df[shapes_df['shape_id'] == shape_id]
         if not shape_data.empty:
             # Sort by shape_pt_sequence
             shape_data = shape_data.sort_values('shape_pt_sequence')
@@ -166,16 +146,9 @@ def get_route_shapes(route_id, trips_df, shapes_df):
             
             if len(coords) > 1:  # Need at least 2 points for a line
                 shapes.append({
-                    'shape_id': str(shape_id),
+                    'shape_id': shape_id,
                     'coords': coords
                 })
-        else:
-            if route_id_str == '116':  # Debug route 116
-                print(f"DEBUG Route 116: Shape {shape_id} not found in shapes_df!")
-                print(f"  Sample shape_ids in shapes: {shapes_df['shape_id'].unique()[:10].tolist()}")
-    
-    if route_id_str == '116':  # Debug route 116
-        print(f"DEBUG Route 116: Returning {len(shapes)} shapes")
     
     return shapes
 
