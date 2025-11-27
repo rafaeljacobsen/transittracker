@@ -44,16 +44,18 @@ with open("mbta_gtfs/trips.txt", "r", encoding="utf-8") as f:
                 if shape_id not in route_shapes[route_id]:
                     route_shapes[route_id].append(shape_id)
 
-# Step 3: Get stop coordinates
+# Step 3: Get stop coordinates and parent station mapping
 stops = {}
+stop_to_parent = {}  # Maps stop_id to parent_station (or stop_id itself if no parent)
 
 with open("mbta_gtfs/stops.txt", "r", encoding="utf-8") as f:
     reader = csv.reader(f)
     next(reader)  # Skip header
     for fields in reader:
-        if len(fields) >= 8:
+        if len(fields) >= 14:
             stop_id = fields[0]
             stop_name = fields[2]
+            parent_station = fields[13] if len(fields) > 13 and fields[13] else None
             try:
                 stop_lat = float(fields[6])
                 stop_lon = float(fields[7])
@@ -62,6 +64,8 @@ with open("mbta_gtfs/stops.txt", "r", encoding="utf-8") as f:
                     'lat': stop_lat,
                     'lon': stop_lon
                 }
+                # Map stop to its parent station (or itself if no parent)
+                stop_to_parent[stop_id] = parent_station if parent_station else stop_id
             except ValueError:
                 pass
 
@@ -131,7 +135,7 @@ if needed_shapes:
 
 # Step 7: Build final data structure
 final_data = {}
-stop_to_routes = defaultdict(list)
+stop_to_routes = defaultdict(set)  # Use set to avoid duplicates
 
 for route_id, route_stop_dict in route_stops.items():
     route_name = target_routes[route_id]['name']
@@ -151,10 +155,31 @@ for route_id, route_stop_dict in route_stops.items():
             })
             
             # Track which routes serve each stop
-            stop_to_routes[stop_id].append(route_name)
+            stop_to_routes[stop_id].add(route_name)
     
     if route_stops_list:
         final_data[route_name] = route_stops_list
+
+# Step 7.5: Merge routes for stops that share the same parent station
+# Build parent station to child stops mapping
+parent_to_stops = defaultdict(list)
+for stop_id, parent_id in stop_to_parent.items():
+    parent_to_stops[parent_id].append(stop_id)
+
+# For each parent station, merge all routes from all child stops
+for parent_id, child_stops in parent_to_stops.items():
+    if len(child_stops) > 1:  # Only process if there are multiple child stops
+        # Collect all routes from all child stops
+        all_routes = set()
+        for child_stop_id in child_stops:
+            all_routes.update(stop_to_routes[child_stop_id])
+        
+        # Assign all routes to each child stop
+        for child_stop_id in child_stops:
+            stop_to_routes[child_stop_id] = all_routes.copy()
+
+# Convert sets to sorted lists for consistent output
+stop_to_routes = {k: sorted(list(v)) for k, v in stop_to_routes.items()}
 
 # Step 8: Generate JavaScript
 js_content = "// MBTA Stops Data - Extracted from GTFS Static Data with Shapes\n"
@@ -216,7 +241,7 @@ js_content += "    module.exports = { mbtaStopsData, stopToRoutes, routeShapes }
 js_content += "}\n"
 
 # Save to file
-with open("mbta-stops-accurate.js", "w", encoding="utf-8") as f:
+with open("mbta-stops.js", "w", encoding="utf-8") as f:
     f.write(js_content)
 
 print("\n" + "="*50)

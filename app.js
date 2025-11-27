@@ -10,22 +10,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const shuttleMarkers = new Map();
         const silverLineMarkers = new Map();
         const lirrMarkers = new Map(); // LIRR train markers
+        const metroNorthMarkers = new Map(); // Metro North train markers
         let trackingInterval;
         let ferryTrackingInterval;
         let busTrackingInterval;
         let shuttleTrackingInterval;
         let silverLineTrackingInterval;
         let lirrTrackingInterval; // LIRR tracking interval
+        let metroNorthTrackingInterval; // Metro North tracking interval
         let lastUpdateTime = 0;
         let lastFerryUpdateTime = 0;
         let lastBusUpdateTime = 0;
         let lastShuttleUpdateTime = 0;
         let lastSilverLineUpdateTime = 0;
         let lastLIRRUpdateTime = 0; // LIRR last update timestamp
+        let lastMetroNorthUpdateTime = 0; // Metro North last update timestamp
         
         // State for line highlighting feature
         let highlightedLine = null;
         let highlightedLIRRLine = null; // Separate highlighting for LIRR/MTA
+        let highlightedMetroNorthLine = null; // Separate highlighting for Metro North/MTA
+        let highlightedSubwayLine = null; // Separate highlighting for MTA Subway
         
         // Bus route loading state
         let busRoutesLoaded = false;
@@ -38,6 +43,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // LIRR route loading state
         let lirrRoutesLoaded = false;
         let lirrRoutesLoading = false;
+        
+        // Metro North route loading state
+        let metroNorthRoutesLoaded = false;
+        let metroNorthRoutesLoading = false;
+        
+        // MTA Subway route loading state
+        let subwayRoutesLoaded = false;
+        let subwayRoutesLoading = false;
         
         // Bus stop visibility state
         let busStopsVisible = false;
@@ -56,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
         map = L.map('map', {
             preferCanvas: true,  // Use canvas for better performance with many objects
             renderer: L.canvas()
-        }).setView([42.361220, -71.057083], 11);
+        }).setView([40.7589, -73.7250], 10); // Start with MTA view (NYC/Long Island)
         
         // Add OpenStreetMap tiles
         const osmTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -80,6 +93,12 @@ document.addEventListener('DOMContentLoaded', function() {
         map.createPane('lirrPane');
         map.getPane('lirrPane').style.zIndex = 406; // LIRR - above MBTA commuter rail
         
+        map.createPane('metroNorthPane');
+        map.getPane('metroNorthPane').style.zIndex = 407; // Metro North - above LIRR
+        
+        map.createPane('subwayPane');
+        map.getPane('subwayPane').style.zIndex = 408; // MTA Subway - above Metro North
+        
         map.createPane('silverLinePane');
         map.getPane('silverLinePane').style.zIndex = 408; // Above commuter rail
         
@@ -96,6 +115,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (highlightedLIRRLine !== null) {
                 resetLIRRHighlight();
+            }
+            if (highlightedMetroNorthLine !== null) {
+                resetMetroNorthHighlight();
+            }
+            if (highlightedSubwayLine !== null) {
+                resetSubwayHighlight();
             }
         });
         
@@ -115,11 +140,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Function to calculate icon size based on zoom level
         function getIconSize(baseSize, currentZoom) {
             // Scale icon size based on zoom: smaller when zoomed out
-            // Zoom 8-9: 60% size, Zoom 10-11: 80% size, Zoom 12+: 100% size
-            if (currentZoom <= 9) {
+            // More aggressive scaling for better visibility at different zoom levels
+            // Zoom 8: 40% size, Zoom 9: 50% size, Zoom 10: 60% size, Zoom 11: 75% size, Zoom 12+: 100% size
+            if (currentZoom <= 8) {
+                return Math.round(baseSize * 0.4);
+            } else if (currentZoom <= 9) {
+                return Math.round(baseSize * 0.5);
+            } else if (currentZoom <= 10) {
                 return Math.round(baseSize * 0.6);
             } else if (currentZoom <= 11) {
-                return Math.round(baseSize * 0.8);
+                return Math.round(baseSize * 0.75);
             } else {
                 return baseSize;
             }
@@ -226,6 +256,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Initialize layers for Metro North routes (if data available)
+        if (typeof metroNorthRoutesData !== 'undefined' && metroNorthRoutesData && metroNorthRoutesData.routes) {
+            try {
+                Object.keys(metroNorthRoutesData.routes).forEach(lineName => {
+                    layers[lineName] = L.layerGroup();
+                    // Don't add to map yet - wait for checkbox
+                });
+            } catch (e) {
+                // Metro North data initialization skipped
+            }
+        }
+        
+        // Initialize layers for MTA Subway routes (if data available)
+        if (typeof mtaSubwayRoutesData !== 'undefined' && mtaSubwayRoutesData && mtaSubwayRoutesData.routes) {
+            try {
+                Object.keys(mtaSubwayRoutesData.routes).forEach(lineName => {
+                    layers[lineName] = L.layerGroup();
+                    // Don't add to map yet - wait for checkbox
+                });
+            } catch (e) {
+                // MTA Subway data initialization skipped
+            }
+        }
+        
         // Generate filter checkboxes dynamically
         const filterContainer = document.getElementById('filter-checkboxes');
         
@@ -241,6 +295,18 @@ document.addEventListener('DOMContentLoaded', function() {
         let lirrLines = [];
         if (typeof lirrRoutesData !== 'undefined' && lirrRoutesData && lirrRoutesData.routes) {
             lirrLines = Object.keys(lirrRoutesData.routes);
+        }
+        
+        // Metro North lines - will be populated from Metro North data if available
+        let metroNorthLines = [];
+        if (typeof metroNorthRoutesData !== 'undefined' && metroNorthRoutesData && metroNorthRoutesData.routes) {
+            metroNorthLines = Object.keys(metroNorthRoutesData.routes);
+        }
+        
+        // MTA Subway lines - will be populated from subway data if available
+        let mtaSubwayLines = [];
+        if (typeof mtaSubwayRoutesData !== 'undefined' && mtaSubwayRoutesData && mtaSubwayRoutesData.routes) {
+            mtaSubwayLines = Object.keys(mtaSubwayRoutesData.routes);
         }
 
         
@@ -731,6 +797,109 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Metro North paths filter (always set up, even if data not available yet)
+        const metroNorthPathsCheckbox = document.getElementById('show-metro-north-paths');
+        if (!metroNorthPathsCheckbox) {
+            console.error('Metro North paths checkbox not found in DOM!');
+        }
+        if (metroNorthPathsCheckbox) {
+            metroNorthPathsCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                
+                // Only proceed if data is available
+                if (metroNorthLines.length === 0) {
+                    return;
+                }
+                
+                if (!metroNorthRoutesLoaded && !metroNorthRoutesLoading) {
+                    // Load Metro North routes if not already loaded
+                    loadMetroNorthRoutes(isChecked);
+                } else if (metroNorthRoutesLoaded) {
+                    // Toggle visibility of already loaded routes
+                    metroNorthLines.forEach(lineName => {
+                        if (layers[lineName]) {
+                            if (isChecked) {
+                                map.addLayer(layers[lineName]);
+                            } else {
+                                map.removeLayer(layers[lineName]);
+                            }
+                        }
+                    });
+                }
+                
+                updateStats();
+            });
+        }
+        
+        // Metro North live tracking filter (always set up, even if data not available yet)
+        const metroNorthLiveCheckbox = document.getElementById('show-metro-north-live');
+        if (metroNorthLiveCheckbox) {
+            metroNorthLiveCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                
+                // Only proceed if data is available
+                if (metroNorthLines.length === 0) {
+                    return;
+                }
+                
+                // Hide/show Metro North train markers
+                metroNorthMarkers.forEach((marker, trainId) => {
+                    if (marker) {
+                        if (isChecked) {
+                            marker.addTo(map);
+                        } else {
+                            marker.remove();
+                        }
+                    }
+                });
+                
+                // Control live tracking for Metro North
+                if (isChecked) {
+                    if (!metroNorthTrackingInterval) {
+                        startMetroNorthTracking();
+                    }
+                } else {
+                    stopMetroNorthTracking();
+                }
+                
+                updateStats();
+            });
+            
+            // Start Metro North tracking if checkbox is checked by default and data is available
+            if (metroNorthLiveCheckbox.checked && metroNorthLines.length > 0) {
+                setTimeout(() => {
+                    startMetroNorthTracking();
+                }, 2000); // Start after 2 seconds to let everything load
+            }
+        }
+        
+        // MTA Subway paths filter (REBUILT FROM SCRATCH - FOLLOWING LIRR PATTERN)
+        const subwayPathsCheckbox = document.getElementById('show-mta-subway-paths');
+        if (subwayPathsCheckbox && mtaSubwayLines.length > 0) {
+            subwayPathsCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                
+                if (!subwayRoutesLoaded && !subwayRoutesLoading) {
+                    // Load subway routes if not already loaded
+                    loadMTASubwayRoutes(isChecked);
+                } else if (subwayRoutesLoaded) {
+                    // Toggle visibility of already loaded routes
+                    mtaSubwayLines.forEach(lineName => {
+                        if (layers[lineName]) {
+                            if (isChecked) {
+                                map.addLayer(layers[lineName]);
+                            } else {
+                                map.removeLayer(layers[lineName]);
+                            }
+                        }
+                    });
+                }
+                
+                updateStats();
+            });
+        }
+        
+        
         // Color scheme for different lines
         const lineColors = {
             'Red Line': '#DA291C',
@@ -780,6 +949,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const route = lirrRoutesData.routes[routeName];
                 // Use route-specific color or default LIRR navy blue
                 const color = route.color || '#00305E';
+                // Ensure color has # prefix if it doesn't
+                lineColors[routeName] = color.startsWith('#') ? color : '#' + color;
+            });
+        }
+        
+        // Add MTA Subway route colors dynamically if data is available
+        if (typeof mtaSubwayRoutesData !== 'undefined' && mtaSubwayRoutesData && mtaSubwayRoutesData.routes) {
+            Object.keys(mtaSubwayRoutesData.routes).forEach(routeName => {
+                const route = mtaSubwayRoutesData.routes[routeName];
+                // Use route-specific color from data
+                const color = route.color || '#808183'; // Default gray
                 // Ensure color has # prefix if it doesn't
                 lineColors[routeName] = color.startsWith('#') ? color : '#' + color;
             });
@@ -842,9 +1022,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Process stop markers - create separate marker for each line
                     stops.forEach(stop => {
                         const stopRoutes = stopToRoutes[stop.stopId] || [];
-                        const isMultiLine = stopRoutes.length > 1;
                         
-                        // Determine if this is a true transfer stop (multiple service types)
+                        // Check if routes have different colors - only mark as multi-line if colors differ
+                        const routeColors = new Set();
+                        stopRoutes.forEach(route => {
+                            const routeColor = lineColors[route] || color;
+                            routeColors.add(routeColor);
+                        });
+                        const isMultiLine = routeColors.size > 1; // Only multi-line if different colors
+                        
+                        // Determine if this is a true transfer stop (multiple service types with different colors)
                         const serviceTypes = new Set();
                         stopRoutes.forEach(route => {
                             // Categorize by line type
@@ -853,13 +1040,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             else if (route === 'Blue Line') serviceTypes.add('Blue');
                             else if (route.startsWith('Green Line')) serviceTypes.add('Green');
                             else if (commuterLines.includes(route) || seasonalLines.includes(route)) {
-                                // Each commuter rail line counts as its own type for transfer detection
-                                serviceTypes.add('Commuter-' + route);
+                                // Group all commuter rail lines together (they share the same color)
+                                serviceTypes.add('Commuter');
                             }
                         });
                         
-                        const isTransferStop = serviceTypes.size > 1;
-                        const stopFillColor = isTransferStop ? '#FFFFFF' : color;
+                        // Only mark as transfer stop if different service types AND different colors
+                        const isTransferStop = serviceTypes.size > 1 && isMultiLine;
+                        // Use route color if not multi-line (same color routes), grey only if different colors
+                        const stopFillColor = isMultiLine ? '#D3D3D3' : color; // Light grey for shared stations with different colors
                         
                         // Set radius based on stop type only, not on number of lines (reduced size)
                         let baseRadius;
@@ -1501,7 +1690,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Check if LIRR data is available
             if (typeof lirrRoutesData === 'undefined' || !lirrRoutesData || !lirrRoutesData.routes) {
-                console.warn('LIRR data not available. Please run parse-lirr-data.py first.');
                 return;
             }
             
@@ -1610,8 +1798,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const servingRoutes = stopInfo.routes;
                         const isMultiRoute = servingRoutes.length > 1;
                         
-                        // Multi-route stops get white fill, single-route stops get route color
-                        const fillColor = isMultiRoute ? '#FFFFFF' : color;
+                        // Multi-route stops get light grey fill, single-route stops get route color
+                        const fillColor = isMultiRoute ? '#D3D3D3' : color; // Light grey for shared stations
                         
                         // Calculate radius based on zoom
                         const baseRadius = 5; // LIRR stops (smaller)
@@ -1693,10 +1881,453 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
+        // Function to load Metro North routes
+        function loadMetroNorthRoutes(showOnMap = false) {
+            if (metroNorthRoutesLoaded || metroNorthRoutesLoading) {
+                // Already loaded or loading - just show/hide as needed
+                if (metroNorthRoutesLoaded) {
+                    metroNorthLines.forEach(lineName => {
+                        if (layers[lineName]) {
+                            if (showOnMap) {
+                                map.addLayer(layers[lineName]);
+                            } else {
+                                map.removeLayer(layers[lineName]);
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+            
+            // Check if Metro North data is available
+            if (typeof metroNorthRoutesData === 'undefined' || !metroNorthRoutesData || !metroNorthRoutesData.routes) {
+                return;
+            }
+            
+            metroNorthRoutesLoading = true;
+            
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('metro-north-loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'table-row';
+            }
+            
+            // Process routes
+            metroNorthLines.forEach(lineName => {
+                const route = metroNorthRoutesData.routes[lineName];
+                if (!route) {
+                    return;
+                }
+                // Use route color from data, fallback to lineColors, then default
+                const color = route.color || lineColors[lineName] || '#003A70';
+                
+                // Render route shapes if available
+                if (route.shapes && route.shapes.length > 0) {
+                    route.shapes.forEach((shape, shapeIndex) => {
+                        let coords = shape.coords;
+                        
+                        if (coords && Array.isArray(coords) && coords.length > 1) {
+                            const trackLine = L.polyline(coords, {
+                                color: color,
+                                weight: 4,
+                                opacity: 0.8,
+                                pane: 'metroNorthPane'
+                            });
+                            
+                            trackLine.bindPopup(`<b>Metro North: ${lineName}</b><br>Route ID: ${route.route_id || 'N/A'}<br>Shape ID: ${shape.shape_id || 'N/A'}<br>Points: ${coords.length}`);
+                            
+                            // Add click handler for highlighting
+                            trackLine.on('click', function(e) {
+                                L.DomEvent.stopPropagation(e);
+                                
+                                // Toggle highlighting
+                                if (highlightedMetroNorthLine === lineName) {
+                                    resetMetroNorthHighlight();
+                                } else {
+                                    highlightMetroNorthLine(lineName);
+                                }
+                            });
+                            
+                            layers[lineName].addLayer(trackLine);
+                        }
+                    });
+                }
+                
+                // Add to map if requested
+                if (showOnMap && layers[lineName]) {
+                    map.addLayer(layers[lineName]);
+                }
+            });
+            
+            // Hide loading indicator
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+            
+            metroNorthRoutesLoaded = true;
+            metroNorthRoutesLoading = false;
+            
+            // Load Metro North stations after routes
+            loadMetroNorthStations();
+        }
+        
+        // Function to load Metro North stations (visible at all zoom levels)
+        function loadMetroNorthStations() {
+            if (typeof metroNorthRoutesData === 'undefined' || !metroNorthRoutesData || !metroNorthRoutesData.routes) {
+                return;
+            }
+            
+            // First pass: Build a map of stop_id -> routes serving that stop
+            const stopToRoutes = new Map();
+            metroNorthLines.forEach(lineName => {
+                const route = metroNorthRoutesData.routes[lineName];
+                if (route && route.stops) {
+                    route.stops.forEach(stop => {
+                        if (!stopToRoutes.has(stop.stop_id)) {
+                            stopToRoutes.set(stop.stop_id, {
+                                stop: stop,
+                                routes: []
+                            });
+                        }
+                        stopToRoutes.get(stop.stop_id).routes.push(lineName);
+                    });
+                }
+            });
+            
+            // Second pass: Create markers and add to route layers
+            // Create a SEPARATE marker instance for each route (not shared)
+            
+            metroNorthLines.forEach(lineName => {
+                const route = metroNorthRoutesData.routes[lineName];
+                // Use route color from data, fallback to lineColors, then default
+                const color = route?.color || lineColors[lineName] || '#003A70';
+                
+                if (!route || !route.stops) {
+                    return;
+                }
+                
+                // Add each stop to this route's layer
+                route.stops.forEach(stop => {
+                    if (stop.lat && stop.lon) {
+                        // Get all routes serving this stop
+                        const stopInfo = stopToRoutes.get(stop.stop_id);
+                        const servingRoutes = stopInfo.routes;
+                        const isMultiRoute = servingRoutes.length > 1;
+                        
+                        // Multi-route stops get light grey fill, single-route stops get route color
+                        const fillColor = isMultiRoute ? '#D3D3D3' : color; // Light grey for shared stations
+                        
+                        // Calculate radius based on zoom
+                        const baseRadius = 5; // Metro North stops (smaller)
+                        const currentZoom = map.getZoom();
+                        const radius = getStopRadius(baseRadius, currentZoom);
+                        
+                        // Create a NEW station marker for THIS route (each route gets its own marker instance)
+                        const stationMarker = L.circleMarker([stop.lat, stop.lon], {
+                            radius: radius,
+                            baseRadius: baseRadius, // Store for zoom updates
+                            fillColor: fillColor,
+                            color: '#fff',
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.8,
+                            pane: 'stopsPane',
+                            interactive: true,
+                            bubblingMouseEvents: false
+                        });
+                        
+                        // Build tooltip with all serving routes (matching MBTA style)
+                        const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
+                        const tooltipText = isMultiRoute ? 
+                            `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Commuter Rail<br>Lines: ${routesText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>` :
+                            `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Commuter Rail<br>Line: ${routesText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>`;
+                        
+                        // Use tooltip direction based on latitude (matching MBTA style)
+                        const tooltipDirection = stop.lat < 40.76 ? 'bottom' : 'top';
+                        stationMarker.bindTooltip(tooltipText, { 
+                            direction: tooltipDirection,
+                            permanent: false,
+                            interactive: true,
+                            className: 'custom-tooltip'
+                        });
+                        
+                        // Add click handler for highlighting
+                        stationMarker.on('click', function(e) {
+                            L.DomEvent.stopPropagation(e);
+                            
+                            // Get all routes serving this stop
+                            const servingRoutes = stopInfo.routes;
+                            
+                            // Check if these routes are already highlighted
+                            const alreadyHighlighted = Array.isArray(highlightedMetroNorthLine) 
+                                ? JSON.stringify(highlightedMetroNorthLine.sort()) === JSON.stringify(servingRoutes.sort())
+                                : highlightedMetroNorthLine === lineName && servingRoutes.length === 1;
+                            
+                            // If something else is already highlighted and this isn't part of it, do nothing
+                            if (highlightedMetroNorthLine && !alreadyHighlighted) {
+                                // Check if any of the serving routes are currently dimmed
+                                const isCurrentlyDimmed = Array.isArray(highlightedMetroNorthLine)
+                                    ? !servingRoutes.some(route => highlightedMetroNorthLine.includes(route))
+                                    : !servingRoutes.includes(highlightedMetroNorthLine);
+                                
+                                if (isCurrentlyDimmed) {
+                                    // Don't allow highlighting a dimmed line - do nothing
+                                    return;
+                                }
+                            }
+                            
+                            // Toggle highlighting
+                            if (alreadyHighlighted) {
+                                resetMetroNorthHighlight();
+                            } else {
+                                if (servingRoutes.length > 1) {
+                                    highlightMultipleMetroNorthLines(servingRoutes);
+                                } else {
+                                    highlightMetroNorthLine(servingRoutes[0]);
+                                }
+                            }
+                        });
+                        
+                        // Add this marker to this route's layer
+                        if (layers[lineName]) {
+                            layers[lineName].addLayer(stationMarker);
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Function to load MTA Subway routes
+        // Function to load MTA Subway routes (REBUILT FROM SCRATCH - FOLLOWING LIRR PATTERN)
+        function loadMTASubwayRoutes(showOnMap = false) {
+            if (subwayRoutesLoaded || subwayRoutesLoading) {
+                // Already loaded or loading - just show/hide as needed
+                if (subwayRoutesLoaded) {
+                    mtaSubwayLines.forEach(lineName => {
+                        if (layers[lineName]) {
+                            if (showOnMap) {
+                                map.addLayer(layers[lineName]);
+                            } else {
+                                map.removeLayer(layers[lineName]);
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+            
+            // Check if subway data is available
+            if (typeof mtaSubwayRoutesData === 'undefined' || !mtaSubwayRoutesData || !mtaSubwayRoutesData.routes) {
+                return;
+            }
+            
+            subwayRoutesLoading = true;
+            
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('mta-subway-loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'table-row';
+            }
+            
+            // Process routes
+            mtaSubwayLines.forEach(lineName => {
+                const route = mtaSubwayRoutesData.routes[lineName];
+                if (!route) {
+                    return;
+                }
+                
+                // Use route color from data, fallback to lineColors, then default
+                const color = route.color || lineColors[lineName] || '#808183';
+                
+                // Render route shapes if available
+                if (route.shapes && route.shapes.length > 0) {
+                    route.shapes.forEach((shape, shapeIndex) => {
+                        let coords = shape.coords;
+                        
+                        if (coords && Array.isArray(coords) && coords.length > 1) {
+                            // Create the colored outer track line
+                            const trackLine = L.polyline(coords, {
+                                color: color,
+                                weight: 5,
+                                opacity: 0.9,
+                                pane: 'subwayPane'
+                            });
+                            
+                            // Create a black center line to distinguish subway from commuter rail
+                            const centerLine = L.polyline(coords, {
+                                color: 'black',
+                                weight: 1.5,
+                                opacity: 0.6,
+                                pane: 'subwayPane',
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            });
+                            
+                            trackLine.bindPopup(`<b>MTA Subway: ${lineName} Line</b><br>${route.long_name || ''}`);
+                            
+                            // Add click handler for highlighting
+                            trackLine.on('click', function(e) {
+                                L.DomEvent.stopPropagation(e);
+                                
+                                // Toggle highlighting
+                                if (highlightedSubwayLine === lineName) {
+                                    resetSubwayHighlight();
+                                } else {
+                                    highlightSubwayLine(lineName);
+                                }
+                            });
+                            
+                            centerLine.on('click', function(e) {
+                                L.DomEvent.stopPropagation(e);
+                                
+                                // Toggle highlighting
+                                if (highlightedSubwayLine === lineName) {
+                                    resetSubwayHighlight();
+                                } else {
+                                    highlightSubwayLine(lineName);
+                                }
+                            });
+                            
+                            // Add track line first, then center line on top
+                            if (layers[lineName]) {
+                                layers[lineName].addLayer(trackLine);
+                                layers[lineName].addLayer(centerLine);
+                            }
+                        }
+                    });
+                }
+                
+                // Add to map if requested
+                if (showOnMap && layers[lineName]) {
+                    layers[lineName].addTo(map);
+                }
+            });
+            
+            // Hide loading indicator
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+            
+            subwayRoutesLoaded = true;
+            subwayRoutesLoading = false;
+            
+            // Load subway stations after routes
+            loadMTASubwayStations();
+        }
+        
+        // Function to load MTA Subway stations (REBUILT FROM SCRATCH - FOLLOWING LIRR PATTERN)
+        function loadMTASubwayStations() {
+            if (typeof mtaSubwayRoutesData === 'undefined' || !mtaSubwayRoutesData || !mtaSubwayRoutesData.routes) {
+                return;
+            }
+            
+            // First pass: Build a map of stop_id -> routes serving that stop
+            const stopToRoutes = new Map();
+            mtaSubwayLines.forEach(lineName => {
+                const route = mtaSubwayRoutesData.routes[lineName];
+                if (route && route.stops) {
+                    route.stops.forEach(stop => {
+                        if (!stopToRoutes.has(stop.stop_id)) {
+                            stopToRoutes.set(stop.stop_id, {
+                                stop: stop,
+                                routes: []
+                            });
+                        }
+                        stopToRoutes.get(stop.stop_id).routes.push(lineName);
+                    });
+                }
+            });
+            
+            // Second pass: Create markers and add to route layers
+            // Create a SEPARATE marker instance for each route (not shared)
+            mtaSubwayLines.forEach(lineName => {
+                const route = mtaSubwayRoutesData.routes[lineName];
+                const color = route.color || lineColors[lineName] || '#808183';
+                
+                if (!route || !route.stops) {
+                    return;
+                }
+                
+                // Add each stop to this route's layer
+                route.stops.forEach(stop => {
+                    if (stop.lat && stop.lon) {
+                        // Get all routes serving this stop
+                        const stopInfo = stopToRoutes.get(stop.stop_id);
+                        const servingRoutes = stopInfo.routes;
+                        const isMultiRoute = servingRoutes.length > 1;
+                        
+                        // Multi-route stops get light grey fill, single-route stops get route color
+                        const fillColor = isMultiRoute ? '#D3D3D3' : color;
+                        
+                        // Calculate radius based on zoom
+                        const baseRadius = 3; // Subway stops (smallest)
+                        const currentZoom = map.getZoom();
+                        const radius = getStopRadius(baseRadius, currentZoom);
+                        
+                        // Create a NEW station marker for THIS route (each route gets its own marker instance)
+                        const stationMarker = L.circleMarker([stop.lat, stop.lon], {
+                            radius: radius,
+                            baseRadius: baseRadius,
+                            fillColor: fillColor,
+                            color: '#fff',
+                            weight: 0.8,
+                            opacity: 1,
+                            fillOpacity: 0.8,
+                            pane: 'stopsPane',
+                            interactive: true,
+                            bubblingMouseEvents: false
+                        });
+                        
+                        // Build tooltip
+                        const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
+                        const tooltipText = isMultiRoute ? 
+                            `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Subway<br>Lines: ${routesText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>` :
+                            `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Subway<br>Line: ${routesText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>`;
+                        
+                        const tooltipDirection = stop.lat < 40.76 ? 'bottom' : 'top';
+                        stationMarker.bindTooltip(tooltipText, { 
+                            direction: tooltipDirection,
+                            permanent: false,
+                            interactive: true,
+                            className: 'custom-tooltip'
+                        });
+                        
+                        // Add click handler for highlighting
+                        stationMarker.on('click', function(e) {
+                            L.DomEvent.stopPropagation(e);
+                            
+                            // Get all routes serving this stop
+                            const servingRoutes = stopInfo.routes;
+                            
+                            // Check if these routes are already highlighted
+                            const alreadyHighlighted = Array.isArray(highlightedSubwayLine) 
+                                ? JSON.stringify(highlightedSubwayLine.sort()) === JSON.stringify(servingRoutes.sort())
+                                : highlightedSubwayLine === lineName && servingRoutes.length === 1;
+                            
+                            // Toggle highlighting
+                            if (alreadyHighlighted) {
+                                resetSubwayHighlight();
+                            } else {
+                                if (servingRoutes.length > 1) {
+                                    highlightMultipleSubwayLines(servingRoutes);
+                                } else {
+                                    highlightSubwayLine(servingRoutes[0]);
+                                }
+                            }
+                        });
+                        
+                        // Add this marker to this route's layer
+                        if (layers[lineName]) {
+                            layers[lineName].addLayer(stationMarker);
+                        }
+                    }
+                });
+            });
+        }
+        
         // Function to load Silver Line routes
         function loadSilverLineRoutes() {
             if (!silverLineData || typeof silverLineData !== 'object') {
-                console.warn('Silver Line data not available');
                 return;
             }
             
@@ -1775,6 +2406,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Store as array if multiple, or single string if one
             highlightedLine = lineNames.length === 1 ? lineNames[0] : lineNames;
             highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedMetroNorthLine = null; // Clear Metro North highlighting
             
             // Always show highlighted lines (even if checkbox is off)
             lineNames.forEach(lineName => {
@@ -1929,6 +2561,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function highlightLine(lineName) {
             highlightedLine = lineName;
             highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedMetroNorthLine = null; // Clear Metro North highlighting
             
             // Always show the highlighted line (even if checkbox is off)
             if (layers[lineName] && !map.hasLayer(layers[lineName])) {
@@ -2071,6 +2704,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Remove all LIRR live train markers
             lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
+            // Hide all Metro North lines when highlighting MBTA lines
+            metroNorthLines.forEach(layerName => {
+                if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                    map.removeLayer(layers[layerName]);
+                }
+            });
+            
+            // Remove all Metro North live train markers
+            metroNorthMarkers.forEach((marker, trainId) => {
                 if (marker && map.hasLayer(marker)) {
                     map.removeLayer(marker);
                 }
@@ -2269,6 +2916,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
+            
+            // Restore Metro North layers based on checkbox state
+            const metroNorthPathsChecked = document.getElementById('show-metro-north-paths').checked;
+            metroNorthLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (metroNorthPathsChecked) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore Metro North live train markers
+            const showMetroNorthLive = document.getElementById('show-metro-north-live').checked;
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    if (showMetroNorthLive && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
         }
         
         // LIRR Highlighting Functions
@@ -2277,6 +2946,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function highlightMultipleLIRRLines(lineNames) {
             highlightedLIRRLine = lineNames;
             highlightedLine = null; // Clear MBTA highlighting
+            highlightedSubwayLine = null; // Clear subway highlighting
             
             // Remove all dimmed LIRR layers from map, keep highlighted ones
             lirrLines.forEach(lineName => {
@@ -2309,6 +2979,18 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.addTo(map);
                         }
                     }
+                } else {
+                    // If marker doesn't have routeName, hide it
+                    if (map.hasLayer(marker)) {
+                        map.removeLayer(marker);
+                    }
+                }
+            });
+            
+            // Hide all Metro North live markers when highlighting LIRR
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
                 }
             });
             
@@ -2361,6 +3043,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function highlightLIRRLine(lineName) {
             highlightedLIRRLine = lineName;
             highlightedLine = null; // Clear MBTA highlighting
+            highlightedSubwayLine = null; // Clear subway highlighting
             
             // Always show the highlighted line (even if checkbox is off)
             if (layers[lineName] && !map.hasLayer(layers[lineName])) {
@@ -2398,6 +3081,18 @@ document.addEventListener('DOMContentLoaded', function() {
                             marker.addTo(map);
                         }
                     }
+                } else {
+                    // If marker doesn't have routeName, hide it
+                    if (map.hasLayer(marker)) {
+                        map.removeLayer(marker);
+                    }
+                }
+            });
+            
+            // Hide all Metro North live markers when highlighting LIRR
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
                 }
             });
             
@@ -2478,10 +3173,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
+            // Restore subway layers based on checkbox state (but respect highlighting)
+            if (!highlightedSubwayLine) {
+                const subwayPathsChecked = document.getElementById('show-mta-subway-paths').checked;
+                mtaSubwayLines.forEach(lineName => {
+                    if (layers[lineName]) {
+                        if (subwayPathsChecked) {
+                            if (!map.hasLayer(layers[lineName])) {
+                                map.addLayer(layers[lineName]);
+                            }
+                        } else {
+                            if (map.hasLayer(layers[lineName])) {
+                                map.removeLayer(layers[lineName]);
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Restore Metro North layers based on checkbox state
+            const metroNorthPathsChecked = document.getElementById('show-metro-north-paths').checked;
+            metroNorthLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (metroNorthPathsChecked) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore Metro North live train markers
+            const showMetroNorthLive = document.getElementById('show-metro-north-live').checked;
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    if (showMetroNorthLive && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
             // Restore MBTA layers based on checkbox states
             Object.keys(layers).forEach(layerName => {
                 // Skip LIRR lines
                 if (lirrLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Skip MTA Subway lines
+                if (mtaSubwayLines.includes(layerName)) {
                     return;
                 }
                 
@@ -2606,6 +3346,835 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // Metro North Highlighting Functions
+        
+        // Function to highlight multiple Metro North lines (for multi-line stops)
+        function highlightMultipleMetroNorthLines(lineNames) {
+            highlightedMetroNorthLine = lineNames;
+            highlightedLine = null; // Clear MBTA highlighting
+            highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedSubwayLine = null; // Clear subway highlighting
+            
+            // Remove all dimmed Metro North layers from map, keep highlighted ones
+            metroNorthLines.forEach(lineName => {
+                const isDimmed = !lineNames.includes(lineName);
+                
+                if (isDimmed) {
+                    if (layers[lineName] && map.hasLayer(layers[lineName])) {
+                        map.removeLayer(layers[lineName]);
+                    }
+                } else {
+                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
+                        map.addLayer(layers[lineName]);
+                    }
+                }
+            });
+            
+            // Remove/show live Metro North markers
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    const isDimmed = !lineNames.includes(marker.routeName);
+                    
+                    if (isDimmed) {
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    } else {
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    }
+                } else {
+                    // If marker doesn't have routeName, hide it
+                    if (map.hasLayer(marker)) {
+                        map.removeLayer(marker);
+                    }
+                }
+            });
+            
+            // Hide all LIRR live markers when highlighting Metro North
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
+            // Hide all MBTA lines when highlighting Metro North lines
+            Object.keys(layers).forEach(layerName => {
+                // Skip Metro North lines
+                if (!metroNorthLines.includes(layerName)) {
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all LIRR lines when highlighting Metro North lines
+            lirrLines.forEach(layerName => {
+                if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                    map.removeLayer(layers[layerName]);
+                }
+            });
+            
+            // Remove all LIRR live train markers
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+        }
+        
+        // Function to highlight a specific Metro North line and dim all others
+        function highlightMetroNorthLine(lineName) {
+            highlightedMetroNorthLine = lineName;
+            highlightedLine = null; // Clear MBTA highlighting
+            highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedSubwayLine = null; // Clear subway highlighting
+            
+            // Always show the highlighted line (even if checkbox is off)
+            if (layers[lineName] && !map.hasLayer(layers[lineName])) {
+                map.addLayer(layers[lineName]);
+            }
+            
+            // Remove dimmed layers from map or show highlighted one
+            metroNorthLines.forEach(layerName => {
+                const isDimmed = layerName !== lineName;
+                
+                if (isDimmed) {
+                    // Remove dimmed layer from map
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                } else {
+                    // Ensure highlighted layer is on map
+                    if (layers[layerName] && !map.hasLayer(layers[layerName])) {
+                        map.addLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Remove/show live Metro North markers
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    const isDimmed = marker.routeName !== lineName;
+                    
+                    if (isDimmed) {
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    } else {
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    }
+                } else {
+                    // If marker doesn't have routeName, hide it
+                    if (map.hasLayer(marker)) {
+                        map.removeLayer(marker);
+                    }
+                }
+            });
+            
+            // Hide all LIRR live markers when highlighting Metro North
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
+            // Hide all MBTA lines when highlighting Metro North lines
+            Object.keys(layers).forEach(layerName => {
+                // Skip Metro North lines
+                if (!metroNorthLines.includes(layerName)) {
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all LIRR lines when highlighting Metro North lines
+            lirrLines.forEach(layerName => {
+                if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                    map.removeLayer(layers[layerName]);
+                }
+            });
+            
+            // Remove all LIRR live train markers
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+        }
+        
+        // Function to reset Metro North highlighting
+        function resetMetroNorthHighlight() {
+            highlightedMetroNorthLine = null;
+            
+            // Add Metro North layers back to map based on checkbox state
+            const metroNorthPathsChecked = document.getElementById('show-metro-north-paths').checked;
+            metroNorthLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (metroNorthPathsChecked) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    } else {
+                        if (map.hasLayer(layers[lineName])) {
+                            map.removeLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Trigger immediate update to show all trains again
+            const showMetroNorthLive = document.getElementById('show-metro-north-live');
+            if (showMetroNorthLive && showMetroNorthLive.checked && typeof fetchMetroNorthTrains === 'function') {
+                // Immediately fetch and display all trains
+                fetchMetroNorthTrains();
+            } else {
+                // If live tracking is off, just re-add existing markers
+                metroNorthMarkers.forEach((marker, trainId) => {
+                    if (marker) {
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    }
+                });
+            }
+            
+            // Restore MBTA layers based on checkbox states
+            Object.keys(layers).forEach(layerName => {
+                // Skip Metro North lines
+                if (metroNorthLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Skip LIRR lines
+                if (lirrLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Skip MTA Subway lines
+                if (mtaSubwayLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Check if this is a subway line
+                if (subwayLines.includes(layerName)) {
+                    if (document.getElementById('show-subway-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a commuter rail line
+                else if (commuterLines.includes(layerName)) {
+                    if (document.getElementById('show-commuter-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a seasonal rail line
+                else if (seasonalLines.includes(layerName)) {
+                    if (document.getElementById('show-seasonal-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a bus route
+                else if (typeof mbtaBusData !== 'undefined' && mbtaBusData[layerName]) {
+                    if (document.getElementById('show-bus-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a shuttle route
+                else if (typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[layerName]) {
+                    if (document.getElementById('show-shuttle-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a Silver Line route
+                else if (typeof silverLineData !== 'undefined' && silverLineData[layerName]) {
+                    if (document.getElementById('show-silver-line-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a ferry route
+                else if (typeof mbtaFerryData !== 'undefined' && mbtaFerryData[layerName]) {
+                    if (document.getElementById('show-ferry-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore MBTA bus stop layers
+            busStopLayers.forEach((layer, layerName) => {
+                const busRoutesChecked = document.getElementById('show-bus-paths').checked;
+                const zoomSufficient = map.getZoom() >= BUS_STOPS_MIN_ZOOM;
+                const routeLayerVisible = layers[layerName] && map.hasLayer(layers[layerName]);
+                
+                if (busRoutesChecked && zoomSufficient && routeLayerVisible) {
+                    if (!map.hasLayer(layer)) {
+                        layer.addTo(map);
+                    }
+                }
+            });
+            
+            // Restore MBTA live vehicle markers
+            trainMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    let shouldShow = false;
+                    if (subwayLines.includes(marker.routeName)) {
+                        shouldShow = document.getElementById('show-subway-live').checked;
+                    } else if (commuterLines.includes(marker.routeName)) {
+                        shouldShow = document.getElementById('show-commuter-live').checked;
+                    } else if (seasonalLines.includes(marker.routeName)) {
+                        shouldShow = document.getElementById('show-seasonal-live').checked;
+                    }
+                    
+                    if (shouldShow && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            busMarkers.forEach((marker, busId) => {
+                if (marker && document.getElementById('show-bus-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            shuttleMarkers.forEach((marker, shuttleId) => {
+                if (marker && document.getElementById('show-shuttle-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            silverLineMarkers.forEach((marker, silverId) => {
+                if (marker && document.getElementById('show-silver-line-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            ferryMarkers.forEach((marker, ferryId) => {
+                if (marker && document.getElementById('show-ferry-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            // Restore LIRR layers based on checkbox state
+            const lirrPathsChecked = document.getElementById('show-lirr-paths').checked;
+            lirrLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (lirrPathsChecked) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore LIRR live train markers
+            const showLIRRLive = document.getElementById('show-lirr-live').checked;
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    if (showLIRRLive && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+        }
+        
+        // Function to highlight multiple subway lines (for multi-line stations)
+        function highlightMultipleSubwayLines(lineNames) {
+            highlightedSubwayLine = lineNames;
+            highlightedLine = null; // Clear MBTA highlighting
+            highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedMetroNorthLine = null; // Clear Metro North highlighting
+            
+            // Remove all dimmed subway layers from map, keep highlighted ones
+            mtaSubwayLines.forEach(lineName => {
+                const isDimmed = !lineNames.includes(lineName);
+                
+                if (isDimmed) {
+                    // Remove dimmed layer from map
+                    if (layers[lineName] && map.hasLayer(layers[lineName])) {
+                        map.removeLayer(layers[lineName]);
+                    }
+                } else {
+                    // Ensure highlighted layer is on map
+                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
+                        map.addLayer(layers[lineName]);
+                    }
+                }
+            });
+            
+            // Hide all other transit lines when highlighting subway lines
+            Object.keys(layers).forEach(layerName => {
+                // Skip subway lines
+                if (!mtaSubwayLines.includes(layerName)) {
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all MBTA bus stop layers
+            busStopLayers.forEach((layer, layerName) => {
+                if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Remove all other live vehicle markers
+            trainMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            busMarkers.forEach((marker, busId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            shuttleMarkers.forEach((marker, shuttleId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            silverLineMarkers.forEach((marker, silverId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            ferryMarkers.forEach((marker, ferryId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+        }
+        
+        // Function to highlight a specific subway line and dim all others
+        // Function to highlight a specific subway line and dim all others (REBUILT FROM SCRATCH - FOLLOWING LIRR PATTERN)
+        function highlightSubwayLine(lineName) {
+            highlightedSubwayLine = lineName;
+            highlightedLine = null; // Clear MBTA highlighting
+            highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedMetroNorthLine = null; // Clear Metro North highlighting
+            
+            // Always show the highlighted line (even if checkbox is off)
+            if (layers[lineName] && !map.hasLayer(layers[lineName])) {
+                map.addLayer(layers[lineName]);
+            }
+            
+            // Remove dimmed layers from map or show highlighted one
+            mtaSubwayLines.forEach(layerName => {
+                const isDimmed = layerName !== lineName;
+                
+                if (isDimmed) {
+                    // Remove dimmed layer from map
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                } else {
+                    // Ensure highlighted layer is on map
+                    if (layers[layerName] && !map.hasLayer(layers[layerName])) {
+                        map.addLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all other transit lines when highlighting subway lines
+            Object.keys(layers).forEach(layerName => {
+                // Skip subway lines
+                if (!mtaSubwayLines.includes(layerName)) {
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all MBTA bus stop layers
+            busStopLayers.forEach((layer, layerName) => {
+                if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Remove all other live vehicle markers
+            trainMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            busMarkers.forEach((marker, busId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            shuttleMarkers.forEach((marker, shuttleId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            silverLineMarkers.forEach((marker, silverId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            ferryMarkers.forEach((marker, ferryId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
+        }
+        
+        // Function to highlight multiple subway lines (for multi-line stations)
+        function highlightMultipleSubwayLines(lineNames) {
+            highlightedSubwayLine = lineNames;
+            highlightedLine = null; // Clear MBTA highlighting
+            highlightedLIRRLine = null; // Clear LIRR highlighting
+            highlightedMetroNorthLine = null; // Clear Metro North highlighting
+            
+            // Remove all dimmed subway layers from map, keep highlighted ones
+            mtaSubwayLines.forEach(layerName => {
+                const isDimmed = !lineNames.includes(layerName);
+                
+                if (isDimmed) {
+                    // Remove dimmed layer from map
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                } else {
+                    // Ensure highlighted layer is on map
+                    if (layers[layerName] && !map.hasLayer(layers[layerName])) {
+                        map.addLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all other transit lines when highlighting subway lines
+            Object.keys(layers).forEach(layerName => {
+                // Skip subway lines
+                if (!mtaSubwayLines.includes(layerName)) {
+                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
+                        map.removeLayer(layers[layerName]);
+                    }
+                }
+            });
+            
+            // Hide all MBTA bus stop layers
+            busStopLayers.forEach((layer, layerName) => {
+                if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Remove all other live vehicle markers
+            trainMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            busMarkers.forEach((marker, busId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            shuttleMarkers.forEach((marker, shuttleId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            silverLineMarkers.forEach((marker, silverId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            ferryMarkers.forEach((marker, ferryId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+        }
+        
+        // Function to reset subway highlighting (REBUILT FROM SCRATCH - FOLLOWING LIRR PATTERN)
+        function resetSubwayHighlight() {
+            highlightedSubwayLine = null;
+            
+            // Add subway layers back to map based on checkbox state
+            const subwayPathsChecked = document.getElementById('show-mta-subway-paths').checked;
+            mtaSubwayLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (subwayPathsChecked) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    } else {
+                        if (map.hasLayer(layers[lineName])) {
+                            map.removeLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore LIRR layers based on checkbox state
+            const lirrPathsCheckedSubwayReset = document.getElementById('show-lirr-paths').checked;
+            lirrLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (lirrPathsCheckedSubwayReset) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore Metro North layers based on checkbox state
+            const metroNorthPathsCheckedSubwayReset = document.getElementById('show-metro-north-paths').checked;
+            metroNorthLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (metroNorthPathsCheckedSubwayReset) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore MBTA layers based on checkbox states
+            Object.keys(layers).forEach(layerName => {
+                // Skip subway lines
+                if (mtaSubwayLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Skip LIRR lines
+                if (lirrLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Skip Metro North lines
+                if (metroNorthLines.includes(layerName)) {
+                    return;
+                }
+                
+                // Check if this is a MBTA subway line
+                if (subwayLines.includes(layerName)) {
+                    if (document.getElementById('show-subway-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a commuter rail line
+                else if (commuterLines.includes(layerName)) {
+                    if (document.getElementById('show-commuter-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a seasonal rail line
+                else if (seasonalLines.includes(layerName)) {
+                    if (document.getElementById('show-seasonal-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a bus route
+                else if (typeof mbtaBusData !== 'undefined' && mbtaBusData[layerName]) {
+                    if (document.getElementById('show-bus-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a shuttle route
+                else if (typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[layerName]) {
+                    if (document.getElementById('show-shuttle-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a Silver Line route
+                else if (typeof silverLineData !== 'undefined' && silverLineData[layerName]) {
+                    if (document.getElementById('show-silver-line-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+                // Check if this is a ferry route
+                else if (typeof mbtaFerryData !== 'undefined' && mbtaFerryData[layerName]) {
+                    if (document.getElementById('show-ferry-paths').checked) {
+                        if (!map.hasLayer(layers[layerName])) {
+                            map.addLayer(layers[layerName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore LIRR layers based on checkbox state
+            const lirrPathsCheckedMNReset = document.getElementById('show-lirr-paths').checked;
+            lirrLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (lirrPathsCheckedMNReset) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore Metro North layers based on checkbox state
+            const metroNorthPathsCheckedMNReset = document.getElementById('show-metro-north-paths').checked;
+            metroNorthLines.forEach(lineName => {
+                if (layers[lineName]) {
+                    if (metroNorthPathsCheckedMNReset) {
+                        if (!map.hasLayer(layers[lineName])) {
+                            map.addLayer(layers[lineName]);
+                        }
+                    }
+                }
+            });
+            
+            // Restore MBTA bus stop layers
+            busStopLayers.forEach((layer, layerName) => {
+                const busRoutesChecked = document.getElementById('show-bus-paths').checked;
+                const zoomSufficient = map.getZoom() >= BUS_STOPS_MIN_ZOOM;
+                const routeLayerVisible = layers[layerName] && map.hasLayer(layers[layerName]);
+                
+                if (busRoutesChecked && zoomSufficient && routeLayerVisible) {
+                    if (!map.hasLayer(layer)) {
+                        layer.addTo(map);
+                    }
+                }
+            });
+            
+            // Restore MBTA live vehicle markers
+            trainMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    let shouldShow = false;
+                    if (subwayLines.includes(marker.routeName)) {
+                        shouldShow = document.getElementById('show-subway-live').checked;
+                    } else if (commuterLines.includes(marker.routeName)) {
+                        shouldShow = document.getElementById('show-commuter-live').checked;
+                    } else if (seasonalLines.includes(marker.routeName)) {
+                        shouldShow = document.getElementById('show-seasonal-live').checked;
+                    }
+                    
+                    if (shouldShow && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            busMarkers.forEach((marker, busId) => {
+                if (marker && document.getElementById('show-bus-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            shuttleMarkers.forEach((marker, shuttleId) => {
+                if (marker && document.getElementById('show-shuttle-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            silverLineMarkers.forEach((marker, silverId) => {
+                if (marker && document.getElementById('show-silver-line-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            ferryMarkers.forEach((marker, ferryId) => {
+                if (marker && document.getElementById('show-ferry-live').checked) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            // Restore LIRR live markers
+            const showLIRRLive = document.getElementById('show-lirr-live').checked;
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    if (showLIRRLive && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            // Restore Metro North live markers
+            const showMetroNorthLive = document.getElementById('show-metro-north-live').checked;
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    if (showMetroNorthLive && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+        }
 
         
         // Add keyboard event listener for Escape key to reset highlighting
@@ -2613,6 +4182,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (event.key === 'Escape' || event.key === 'Esc') {
                 resetHighlight();
                 resetLIRRHighlight();
+                resetMetroNorthHighlight();
+                resetSubwayHighlight();
             }
         });
 
@@ -3595,6 +5166,509 @@ document.addEventListener('DOMContentLoaded', function() {
             lirrTrackingInterval = setInterval(fetchLIRRTrains, 5000); // Update every 5 seconds
         }
         
+        // Function to start Metro North live tracking
+        function startMetroNorthTracking() {
+            if (metroNorthTrackingInterval) {
+                clearInterval(metroNorthTrackingInterval);
+            }
+            
+            // Initial fetch
+            fetchMetroNorthTrains();
+            
+            // Set up interval for updates (5 seconds for near real-time)
+            metroNorthTrackingInterval = setInterval(fetchMetroNorthTrains, 5000); // Update every 5 seconds
+        }
+        
+        // Function to fetch live Metro North trains from MTA GTFS-RT API
+        async function fetchMetroNorthTrains() {
+            // Note: MTA feeds are now free and don't require API keys!
+            // Source: https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs-mnr
+            
+            try {
+                const now = Date.now();
+                
+                // Rate limiting - don't update more than once every 5 seconds
+                if (now - lastMetroNorthUpdateTime < 5000) {
+                    return;
+                }
+                
+                lastMetroNorthUpdateTime = now;
+                
+                // MTA Metro North GTFS-RT feed URL (no API key needed!)
+                const METRO_NORTH_GTFS_RT_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs-mnr';
+                
+                // Fetch the GTFS-RT feed
+                const response = await fetch(METRO_NORTH_GTFS_RT_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const buffer = await response.arrayBuffer();
+                
+                // Load GTFS-RT proto definition (use local file to avoid GitHub Pages URL resolution issues)
+                const root = await protobuf.load('./gtfs-realtime.proto');
+                const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
+                
+                // Decode the protobuf
+                const feed = FeedMessage.decode(new Uint8Array(buffer));
+                
+                // Extract vehicle positions
+                const vehicles = [];
+                feed.entity.forEach(entity => {
+                    if (entity.vehicle && entity.vehicle.position) {
+                        vehicles.push(entity.vehicle);
+                    }
+                });
+                
+                // Update markers with vehicle data
+                updateMetroNorthMarkers(vehicles);
+                
+            } catch (error) {
+                console.error('❌ Error fetching Metro North trains:', error);
+                console.error('Error details:', error.message);
+            }
+        }
+        
+        // Function to update Metro North train markers on the map
+        function updateMetroNorthMarkers(vehicles) {
+            // Store currently open popups
+            const currentMetroNorthPopups = new Map();
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker.isPopupOpen()) {
+                    currentMetroNorthPopups.set(trainId, true);
+                }
+            });
+            
+            // Clear old markers
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && marker.remove) {
+                    marker.remove();
+                }
+            });
+            metroNorthMarkers.clear();
+            
+            // Process vehicle position data from GTFS-RT
+            if (vehicles && Array.isArray(vehicles)) {
+                vehicles.forEach(vehicle => {
+                    if (vehicle.position && vehicle.position.latitude && vehicle.position.longitude) {
+                        const lat = vehicle.position.latitude;
+                        const lon = vehicle.position.longitude;
+                        const trainId = vehicle.vehicle?.id || 'unknown';
+                        const tripId = vehicle.trip?.tripId || vehicle.trip?.trip_id;
+                        const startDate = vehicle.trip?.startDate || vehicle.trip?.start_date;
+                        const currentStopSequence = vehicle.currentStopSequence || vehicle.current_stop_sequence;
+                        const currentStatus = vehicle.currentStatus || vehicle.current_status;
+                        
+                        // Map trip_id to route using the tripToRoute mapping
+                        let routeName = 'Metro North Train';
+                        let color = '#003A70'; // Default Metro North blue
+                        let routeId = null;
+                        
+                        // Check for headsign/destination in trip descriptor
+                        const stopId = vehicle.stopId || vehicle.stop_id;
+                        const directionId = vehicle.trip?.directionId || vehicle.trip?.direction_id;
+                        
+                        // Try to get routeId directly from vehicle.trip if available (GTFS-RT TripDescriptor has route_id field)
+                        // Check multiple possible field names (protobuf can use different property access patterns)
+                        let tripRouteId = null;
+                        if (vehicle.trip) {
+                            tripRouteId = vehicle.trip.routeId || 
+                                         vehicle.trip.route_id || 
+                                         vehicle.trip.routeId ||
+                                         (vehicle.trip.routeId !== undefined ? vehicle.trip.routeId : null) ||
+                                         (vehicle.trip.route_id !== undefined ? vehicle.trip.route_id : null);
+                        }
+                        
+                        // Also try accessing via bracket notation in case properties are not directly accessible
+                        if (!tripRouteId && vehicle.trip) {
+                            try {
+                                tripRouteId = vehicle.trip['routeId'] || 
+                                             vehicle.trip['route_id'] ||
+                                             vehicle.trip['routeId'];
+                            } catch (e) {
+                                // Ignore
+                            }
+                        }
+                        
+                        // Protobuf.js sometimes stores fields with numeric keys or in a _fields object
+                        if (!tripRouteId && vehicle.trip) {
+                            try {
+                                // Check if there's a _fields or similar structure
+                                if (vehicle.trip._fields) {
+                                    tripRouteId = vehicle.trip._fields.routeId || vehicle.trip._fields.route_id;
+                                }
+                                // Try accessing by field number (route_id is field 5 in TripDescriptor)
+                                if (!tripRouteId && vehicle.trip[5]) {
+                                    tripRouteId = vehicle.trip[5];
+                                }
+                            } catch (e) {
+                                // Ignore
+                            }
+                        }
+                        
+                        if (tripRouteId && metroNorthRoutesData && metroNorthRoutesData.routes) {
+                            // Find the route name from route_id directly
+                            for (const [name, route] of Object.entries(metroNorthRoutesData.routes)) {
+                                if (route.route_id === tripRouteId || route.route_id === String(tripRouteId)) {
+                                    routeName = name;
+                                    routeId = tripRouteId;
+                                    color = lineColors[name] || route.color || color;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // CRITICAL: Metro North real-time feed uses trip_short_name, not trip_id!
+                        // The tripId from the feed (e.g., "1838") is actually the trip_short_name
+                        if (!routeId && tripId && metroNorthRoutesData && metroNorthRoutesData.tripShortNameToRoute) {
+                            // Try to map trip_short_name to route_id
+                            routeId = metroNorthRoutesData.tripShortNameToRoute[tripId];
+                            
+                            if (routeId && metroNorthRoutesData.routes) {
+                                // Find the route name from route_id
+                                for (const [name, route] of Object.entries(metroNorthRoutesData.routes)) {
+                                    if (route.route_id === routeId || route.route_id === String(routeId)) {
+                                        routeName = name;
+                                        color = lineColors[name] || route.color || color;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If tripId is a simple number and might actually be a route_id, try that
+                        // Metro North route_ids are simple numbers (1, 2, 3, 4, 5, 6)
+                        if (!routeId && tripId && /^\d+$/.test(tripId) && metroNorthRoutesData && metroNorthRoutesData.routes) {
+                            // Check if tripId matches a route_id directly
+                            for (const [name, route] of Object.entries(metroNorthRoutesData.routes)) {
+                                if (route.route_id === tripId || route.route_id === String(tripId)) {
+                                    routeName = name;
+                                    routeId = tripId;
+                                    color = lineColors[name] || route.color || color;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Also check if trainId might contain route information (some systems encode route in vehicle ID)
+                        if (!routeId && trainId && /^\d+$/.test(trainId) && metroNorthRoutesData && metroNorthRoutesData.routes) {
+                            // Check if trainId matches a route_id
+                            for (const [name, route] of Object.entries(metroNorthRoutesData.routes)) {
+                                if (route.route_id === trainId || route.route_id === String(trainId)) {
+                                    routeName = name;
+                                    routeId = trainId;
+                                    color = lineColors[name] || route.color || color;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // If we don't have routeId yet, try to map from tripId (exactly like LIRR does)
+                        if (!routeId && tripId && metroNorthRoutesData && metroNorthRoutesData.tripToRoute) {
+                            // Try exact match first
+                            routeId = metroNorthRoutesData.tripToRoute[tripId];
+                            
+                            // If no exact match, try without date suffix (e.g., "93X_2025-11-20" -> "93X")
+                            if (!routeId && tripId.includes('_')) {
+                                const tripIdWithoutDate = tripId.split('_')[0];
+                                routeId = metroNorthRoutesData.tripToRoute[tripIdWithoutDate];
+                            }
+                            
+                            // Additional fallback: try matching with startDate if available
+                            if (!routeId && tripId && startDate) {
+                                const tripIdWithDate = `${tripId}_${startDate}`;
+                                routeId = metroNorthRoutesData.tripToRoute[tripIdWithDate];
+                            }
+                            
+                            // If still no match, try with different separators or formats
+                            if (!routeId && tripId) {
+                                // Try matching just the numeric part if tripId is numeric
+                                if (/^\d+$/.test(tripId)) {
+                                    // Look for any trip that starts with this number or contains it
+                                    for (const [tripKey, routeKey] of Object.entries(metroNorthRoutesData.tripToRoute)) {
+                                        if (tripKey.startsWith(tripId + '_') || tripKey === tripId || 
+                                            tripKey.endsWith('_' + tripId) || tripKey.includes('_' + tripId + '_')) {
+                                            routeId = routeKey;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // For non-numeric tripIds, try partial matching
+                                    for (const [tripKey, routeKey] of Object.entries(metroNorthRoutesData.tripToRoute)) {
+                                        if (tripKey.includes(tripId) || tripId.includes(tripKey.split('_')[0])) {
+                                            routeId = routeKey;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (routeId && metroNorthRoutesData.routes) {
+                                // Find the route name from route_id
+                                for (const [name, route] of Object.entries(metroNorthRoutesData.routes)) {
+                                    if (route.route_id === routeId) {
+                                        routeName = name;
+                                        color = lineColors[name] || route.color || color;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Debug: Log vehicle structure to understand what's available (only occasionally to avoid spam)
+                        if (routeName === 'Metro North Train' && Math.random() < 0.1) {
+                            console.log('🔍 Metro North route lookup - available data:', {
+                                tripId,
+                                tripRouteId,
+                                routeId,
+                                startDate,
+                                trainId,
+                                vehicleTripKeys: vehicle.trip ? Object.keys(vehicle.trip) : [],
+                                vehicleTrip: vehicle.trip,
+                                vehicleVehicle: vehicle.vehicle,
+                                tripToRouteSize: metroNorthRoutesData?.tripToRoute ? Object.keys(metroNorthRoutesData.tripToRoute).length : 0,
+                                sampleTripIds: metroNorthRoutesData?.tripToRoute ? Object.keys(metroNorthRoutesData.tripToRoute).slice(0, 5) : [],
+                                availableRoutes: metroNorthRoutesData?.routes ? Object.keys(metroNorthRoutesData.routes) : []
+                            });
+                        }
+                        
+                        // Last resort: If we have a routeId but couldn't find the route name, try to find it by route_id
+                        if (routeId && routeName === 'Metro North Train' && metroNorthRoutesData && metroNorthRoutesData.routes) {
+                            for (const [name, route] of Object.entries(metroNorthRoutesData.routes)) {
+                                if (route.route_id === routeId || route.route_id === String(routeId)) {
+                                    routeName = name;
+                                    color = lineColors[name] || route.color || color;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // If we couldn't map it, show the trip ID
+                        if (routeName === 'Metro North Train' && tripId) {
+                            routeName = `Trip ${tripId}`;
+                        }
+                        
+                        // Create Metro North train icon
+                        const baseIconSize = 20;
+                        const currentZoom = map.getZoom();
+                        const iconSize = getIconSize(baseIconSize, currentZoom);
+                        
+                        const metroNorthIcon = L.icon({
+                            iconUrl: 'icons/mtacirc.png',
+                            iconSize: [iconSize, iconSize],
+                            iconAnchor: [iconSize / 2, iconSize / 2],
+                            baseIconSize: baseIconSize
+                        });
+                        
+                        const trainMarker = L.marker([lat, lon], {
+                            icon: metroNorthIcon,
+                            zIndexOffset: 200
+                        });
+                        
+                        // Store train info for reference
+                        trainMarker.routeName = routeName;
+                        trainMarker.trainId = trainId;
+                        trainMarker.tripId = tripId;
+                        
+                        // Add click handler for highlighting (if we have a valid route)
+                        if (routeId && routeName !== 'Metro North Train' && !routeName.startsWith('Trip ')) {
+                            trainMarker.on('click', function(e) {
+                                L.DomEvent.stopPropagation(e);
+                                
+                                // Toggle highlighting
+                                if (highlightedMetroNorthLine === routeName) {
+                                    resetMetroNorthHighlight();
+                                } else {
+                                    highlightMetroNorthLine(routeName);
+                                }
+                            });
+                        }
+                        
+                        // Create tooltip with train info
+                        let tooltipContent = `
+                            <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;">
+                                <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
+                                    <img src="${metroNorthIcon.options.iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                                    Live Metro North Train
+                                </div>`;
+                        
+                        // Show line if we have route information
+                        if (routeId && !routeName.startsWith('Trip ')) {
+                            tooltipContent += `<b>Line:</b> ${routeName}<br>`;
+                        }
+                        
+                        // Show terminus/destination from headsign (exactly like LIRR does)
+                        // First try to get headsign directly from vehicle.trip.tripProperties if available (GTFS-RT extension)
+                        let headsign = vehicle.trip?.tripProperties?.tripHeadsign || 
+                                      vehicle.trip?.trip_properties?.trip_headsign ||
+                                      vehicle.trip?.tripProperties?.trip_headsign ||
+                                      vehicle.trip?.tripHeadsign || 
+                                      vehicle.trip?.trip_headsign || 
+                                      vehicle.trip?.headsign || null;
+                        
+                        // CRITICAL: Metro North real-time feed uses trip_short_name, not trip_id!
+                        // Try to get headsign from tripShortNameToHeadsign mapping first
+                        if (!headsign && tripId && metroNorthRoutesData && metroNorthRoutesData.tripShortNameToHeadsign) {
+                            headsign = metroNorthRoutesData.tripShortNameToHeadsign[tripId];
+                        }
+                        
+                        // If not available, try to get from tripToHeadsign mapping (exactly like LIRR)
+                        if (!headsign && tripId && metroNorthRoutesData && metroNorthRoutesData.tripToHeadsign) {
+                            // Try exact match first
+                            headsign = metroNorthRoutesData.tripToHeadsign[tripId];
+                            
+                            // If no exact match, try without date suffix
+                            if (!headsign && tripId.includes('_')) {
+                                const tripIdWithoutDate = tripId.split('_')[0];
+                                headsign = metroNorthRoutesData.tripToHeadsign[tripIdWithoutDate];
+                            }
+                            
+                            // Additional fallback: try matching with startDate if available
+                            if (!headsign && tripId && startDate) {
+                                const tripIdWithDate = `${tripId}_${startDate}`;
+                                headsign = metroNorthRoutesData.tripToHeadsign[tripIdWithDate];
+                            }
+                            
+                            // If still no match, try matching with different formats
+                            if (!headsign && tripId) {
+                                // Try matching just the numeric part if tripId is numeric
+                                if (/^\d+$/.test(tripId)) {
+                                    // Look for any trip that starts with this number or contains it
+                                    for (const [tripKey, tripHeadsign] of Object.entries(metroNorthRoutesData.tripToHeadsign)) {
+                                        if (tripKey.startsWith(tripId + '_') || tripKey === tripId || 
+                                            tripKey.endsWith('_' + tripId) || tripKey.includes('_' + tripId + '_')) {
+                                            headsign = tripHeadsign;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // For non-numeric tripIds, try partial matching
+                                    for (const [tripKey, tripHeadsign] of Object.entries(metroNorthRoutesData.tripToHeadsign)) {
+                                        if (tripKey.includes(tripId) || tripId.includes(tripKey.split('_')[0])) {
+                                            headsign = tripHeadsign;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (headsign) {
+                            tooltipContent += `<b>Terminus:</b> ${headsign}<br>`;
+                        }
+                        
+                        tooltipContent += `<b>Train ID:</b> ${trainId}<br>`;
+                        
+                        // Show trip ID
+                        if (tripId) {
+                            tooltipContent += `<b>Trip:</b> ${tripId}<br>`;
+                        }
+                        
+                        // Add status if available
+                        if (currentStatus) {
+                            let statusText = currentStatus;
+                            if (currentStatus === 'STOPPED_AT' || currentStatus === 0) {
+                                statusText = 'Stopped at Station';
+                            } else if (currentStatus === 'IN_TRANSIT_TO' || currentStatus === 1) {
+                                statusText = 'In Transit';
+                            } else if (currentStatus === 'INCOMING_AT' || currentStatus === 2) {
+                                statusText = 'Approaching Station';
+                            }
+                            tooltipContent += `<b>Status:</b> ${statusText}<br>`;
+                        }
+                        
+                        tooltipContent += `
+                            <b>Position:</b> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+                            <b>Last Update:</b> ${new Date().toLocaleTimeString()}
+                            </div>
+                        `;
+                        
+                        // Use tooltip for all trains, direction based on latitude
+                        const tooltipDirection = lat < 40.76 ? 'bottom' : 'top';
+                        trainMarker.bindTooltip(tooltipContent, { 
+                            direction: tooltipDirection,
+                            permanent: false,
+                            interactive: true,
+                            className: 'custom-tooltip'
+                        });
+                        
+                        // Add to map if Metro North live tracking is enabled
+                        const metroNorthLiveCheckbox = document.getElementById('show-metro-north-live');
+                        let shouldAddToMap = false;
+                        
+                        if (metroNorthLiveCheckbox && metroNorthLiveCheckbox.checked) {
+                            // Don't show Metro North trains if MBTA line is highlighted
+                            if (highlightedLine) {
+                                // MBTA line is highlighted, hide all Metro North trains
+                                // Don't add to map or store
+                                return;
+                            }
+                            
+                            // Don't show Metro North trains if LIRR line is highlighted
+                            if (highlightedLIRRLine) {
+                                // LIRR line is highlighted, hide all Metro North trains
+                                // Don't add to map or store
+                                return;
+                            }
+                            
+                            // Don't show Metro North trains if subway line is highlighted
+                            if (highlightedSubwayLine) {
+                                // Subway line is highlighted, hide all Metro North trains
+                                // Don't add to map or store
+                                return;
+                            }
+                            
+                            // Check if Metro North highlighting is active
+                            if (highlightedMetroNorthLine) {
+                                // Only show if this train is on the highlighted line
+                                const isHighlighted = Array.isArray(highlightedMetroNorthLine)
+                                    ? highlightedMetroNorthLine.includes(routeName)
+                                    : highlightedMetroNorthLine === routeName;
+                                
+                                if (isHighlighted) {
+                                    shouldAddToMap = true;
+                                }
+                            } else {
+                                // No highlight active, show all trains
+                                shouldAddToMap = true;
+                            }
+                            
+                            // Only add to map and store if it should be shown
+                            if (shouldAddToMap) {
+                                trainMarker.addTo(map);
+                                metroNorthMarkers.set(trainId, trainMarker);
+                            }
+                        }
+                        
+                        // Restore popup if it was open before
+                        if (currentMetroNorthPopups.has(trainId)) {
+                            trainMarker.openPopup();
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Stop Metro North tracking
+        function stopMetroNorthTracking() {
+            if (metroNorthTrackingInterval) {
+                clearInterval(metroNorthTrackingInterval);
+                metroNorthTrackingInterval = null;
+            }
+            
+            // Clear all Metro North train markers
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && marker.remove) {
+                    marker.remove();
+                }
+            });
+            metroNorthMarkers.clear();
+        }
+        
+        // MTA Subway Live Tracking Functions
+        
+        // Function to start Subway live tracking
         // Function to fetch live LIRR trains from MTA GTFS-RT API
         async function fetchLIRRTrains() {
             // Note: MTA feeds are now free and don't require API keys!
@@ -3672,6 +5746,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const lon = vehicle.position.longitude;
                         const trainId = vehicle.vehicle?.id || 'unknown';
                         const tripId = vehicle.trip?.tripId || vehicle.trip?.trip_id;
+                        const tripShortName = vehicle.trip?.tripShortName || vehicle.trip?.trip_short_name;
                         const startDate = vehicle.trip?.startDate || vehicle.trip?.start_date;
                         const currentStopSequence = vehicle.currentStopSequence || vehicle.current_stop_sequence;
                         const currentStatus = vehicle.currentStatus || vehicle.current_status;
@@ -3685,8 +5760,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         const stopId = vehicle.stopId || vehicle.stop_id;
                         const directionId = vehicle.trip?.directionId || vehicle.trip?.direction_id;
                         
+                        // Try to get routeId directly from vehicle.trip if available (GTFS-RT TripDescriptor has route_id field)
+                        const tripRouteId = vehicle.trip?.routeId || vehicle.trip?.route_id;
                         
-                        if (tripId && lirrRoutesData && lirrRoutesData.tripToRoute) {
+                        if (tripRouteId && lirrRoutesData && lirrRoutesData.routes) {
+                            // Find the route name from route_id directly
+                            for (const [name, route] of Object.entries(lirrRoutesData.routes)) {
+                                if (route.route_id === tripRouteId) {
+                                    routeName = name;
+                                    routeId = tripRouteId;
+                                    color = lineColors[name] || color;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // If we don't have routeId yet, try trip_short_name first (real-time feed often uses this)
+                        if (!routeId && tripShortName && lirrRoutesData && lirrRoutesData.tripShortNameToRoute) {
+                            routeId = lirrRoutesData.tripShortNameToRoute[tripShortName];
+                            
+                            if (routeId && lirrRoutesData.routes) {
+                                // Find the route name from route_id
+                                for (const [name, route] of Object.entries(lirrRoutesData.routes)) {
+                                    if (route.route_id === routeId) {
+                                        routeName = name;
+                                        color = lineColors[name] || color;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If we still don't have routeId, try to map from tripId
+                        if (!routeId && tripId && lirrRoutesData && lirrRoutesData.tripToRoute) {
                             // Try exact match first
                             routeId = lirrRoutesData.tripToRoute[tripId];
                             
@@ -3694,6 +5800,35 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (!routeId && tripId.includes('_')) {
                                 const tripIdWithoutDate = tripId.split('_')[0];
                                 routeId = lirrRoutesData.tripToRoute[tripIdWithoutDate];
+                            }
+                            
+                            // Additional fallback: try matching with startDate if available
+                            if (!routeId && tripId && startDate) {
+                                const tripIdWithDate = `${tripId}_${startDate}`;
+                                routeId = lirrRoutesData.tripToRoute[tripIdWithDate];
+                            }
+                            
+                            // If still no match, try partial matching (like Metro North does)
+                            if (!routeId && tripId) {
+                                // Try matching just the numeric part if tripId is numeric
+                                if (/^\d+$/.test(tripId)) {
+                                    // Look for any trip that starts with this number or contains it
+                                    for (const [tripKey, routeKey] of Object.entries(lirrRoutesData.tripToRoute)) {
+                                        if (tripKey.startsWith(tripId + '_') || tripKey === tripId || 
+                                            tripKey.endsWith('_' + tripId) || tripKey.includes('_' + tripId + '_')) {
+                                            routeId = routeKey;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // Try fuzzy matching - look for trips that contain the tripId
+                                    for (const [tripKey, routeKey] of Object.entries(lirrRoutesData.tripToRoute)) {
+                                        if (tripKey.includes(tripId) || tripId.includes(tripKey.split('_')[0])) {
+                                            routeId = routeKey;
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                             
                             if (routeId && lirrRoutesData.routes) {
@@ -3763,9 +5898,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         
                         // Show terminus/destination from headsign
-                        if (tripId && lirrRoutesData && lirrRoutesData.tripToHeadsign) {
+                        // First try to get headsign directly from vehicle.trip.tripProperties if available (GTFS-RT extension)
+                        let headsign = vehicle.trip?.tripProperties?.tripHeadsign || 
+                                      vehicle.trip?.trip_properties?.trip_headsign ||
+                                      vehicle.trip?.tripProperties?.trip_headsign ||
+                                      vehicle.trip?.tripHeadsign || 
+                                      vehicle.trip?.trip_headsign || 
+                                      vehicle.trip?.headsign || null;
+                        
+                        // If not available, try to get from tripToHeadsign mapping
+                        if (!headsign && tripId && lirrRoutesData && lirrRoutesData.tripToHeadsign) {
                             // Try exact match first
-                            let headsign = lirrRoutesData.tripToHeadsign[tripId];
+                            headsign = lirrRoutesData.tripToHeadsign[tripId];
                             
                             // If no exact match, try without date suffix
                             if (!headsign && tripId.includes('_')) {
@@ -3773,9 +5917,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 headsign = lirrRoutesData.tripToHeadsign[tripIdWithoutDate];
                             }
                             
-                            if (headsign) {
-                                tooltipContent += `<b>Terminus:</b> ${headsign}<br>`;
+                            // Additional fallback: try matching with startDate if available
+                            if (!headsign && tripId && startDate) {
+                                const tripIdWithDate = `${tripId}_${startDate}`;
+                                headsign = lirrRoutesData.tripToHeadsign[tripIdWithDate];
                             }
+                        }
+                        
+                        if (headsign) {
+                            tooltipContent += `<b>Terminus:</b> ${headsign}<br>`;
                         }
                         
                         tooltipContent += `<b>Train ID:</b> ${trainId}<br>`;
@@ -3815,10 +5965,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Add to map if LIRR live tracking is enabled
                         const lirrLiveCheckbox = document.getElementById('show-lirr-live');
+                        let shouldAddToMap = false;
+                        
                         if (lirrLiveCheckbox && lirrLiveCheckbox.checked) {
                             // Don't show LIRR trains if MBTA line is highlighted
                             if (highlightedLine) {
                                 // MBTA line is highlighted, hide all LIRR trains
+                                // Don't add to map or store
+                                return;
+                            }
+                            
+                            // Don't show LIRR trains if subway line is highlighted
+                            if (highlightedSubwayLine) {
+                                // Subway line is highlighted, hide all LIRR trains
+                                // Don't add to map or store
                                 return;
                             }
                             
@@ -3830,15 +5990,19 @@ document.addEventListener('DOMContentLoaded', function() {
                                     : highlightedLIRRLine === routeName;
                                 
                                 if (isHighlighted) {
-                                    trainMarker.addTo(map);
+                                    shouldAddToMap = true;
                                 }
                             } else {
                                 // No highlight active, show all trains
+                                shouldAddToMap = true;
+                            }
+                            
+                            // Only add to map and store if it should be shown
+                            if (shouldAddToMap) {
                                 trainMarker.addTo(map);
+                                lirrMarkers.set(trainId, trainMarker);
                             }
                         }
-                        
-                        lirrMarkers.set(trainId, trainMarker);
                         
                         // Restore popup if it was open before
                         if (currentLIRRPopups.has(trainId)) {
@@ -3917,6 +6081,18 @@ document.addEventListener('DOMContentLoaded', function() {
         // Load LIRR routes if checkbox is checked by default
         if (lirrLines.length > 0 && document.getElementById('show-lirr-paths')?.checked) {
             loadLIRRRoutes(true);
+        }
+        
+        // Load Metro North routes if checkbox is checked
+        const metroNorthPathsCheckboxOnLoad = document.getElementById('show-metro-north-paths');
+        if (metroNorthLines.length > 0 && metroNorthPathsCheckboxOnLoad?.checked) {
+            loadMetroNorthRoutes(true);
+        }
+        
+        // Load MTA Subway routes if checkbox is checked
+        const subwayPathsCheckboxOnLoad = document.getElementById('show-mta-subway-paths');
+        if (mtaSubwayLines.length > 0 && subwayPathsCheckboxOnLoad?.checked) {
+            loadMTASubwayRoutes(true);
         }
         
         // Start tracking after a short delay to let the map load

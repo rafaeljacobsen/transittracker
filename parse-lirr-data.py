@@ -191,9 +191,14 @@ class LIRRDataParser:
         trip_to_route = {}
         # Map trip_id -> headsign (destination)
         trip_to_headsign = {}
+        # Map trip_short_name -> route_id (for real-time feed matching)
+        trip_short_name_to_route = {}
+        # Map trip_short_name -> headsign (for real-time feed matching)
+        trip_short_name_to_headsign = {}
         
         for row in trips_data:
             trip_id = row.get('trip_id', '')
+            trip_short_name = row.get('trip_short_name', '')
             route_id = row.get('route_id', '')
             headsign = row.get('trip_headsign', '')
             
@@ -202,10 +207,19 @@ class LIRRDataParser:
             
             if trip_id and headsign:
                 trip_to_headsign[trip_id] = headsign
+            
+            # Also map trip_short_name (this is what the real-time feed often uses!)
+            if trip_short_name and route_id:
+                trip_short_name_to_route[trip_short_name] = route_id
+            
+            if trip_short_name and headsign:
+                trip_short_name_to_headsign[trip_short_name] = headsign
         
         print(f"✅ Mapped {len(trip_to_route)} trips to routes")
         print(f"✅ Mapped {len(trip_to_headsign)} trips to destinations")
-        return trip_to_route, trip_to_headsign
+        print(f"✅ Mapped {len(trip_short_name_to_route)} trip short names to routes (for real-time feed)")
+        print(f"✅ Mapped {len(trip_short_name_to_headsign)} trip short names to destinations (for real-time feed)")
+        return trip_to_route, trip_to_headsign, trip_short_name_to_route, trip_short_name_to_headsign
     
     def generate_route_data(self):
         """Generate complete route data file"""
@@ -214,7 +228,7 @@ class LIRRDataParser:
         route_shapes_map = self.map_shapes_to_routes()
         route_stops_map, stop_names = self.map_stops_to_routes()
         stops_full = self.parse_stops()
-        trip_to_route_map, trip_to_headsign_map = self.map_trips_to_routes()
+        trip_to_route_map, trip_to_headsign_map, trip_short_name_to_route_map, trip_short_name_to_headsign_map = self.map_trips_to_routes()
         
         # Create stop_id -> full stop details mapping
         stop_details = {}
@@ -229,6 +243,8 @@ class LIRRDataParser:
             'totalRoutes': len(routes),
             'tripToRoute': trip_to_route_map,  # Add trip mapping for live tracking
             'tripToHeadsign': trip_to_headsign_map,  # Add headsign mapping for destinations
+            'tripShortNameToRoute': trip_short_name_to_route_map,  # Map trip_short_name to route_id (real-time feed uses this!)
+            'tripShortNameToHeadsign': trip_short_name_to_headsign_map,  # Map trip_short_name to headsign (real-time feed uses this!)
             'routes': {}
         }
         

@@ -85,12 +85,12 @@
         <div class="panel-content">
             <!-- Transit System Tabs -->
             <div class="transit-tabs">
-                <button class="tab-button active" onclick="switchTab('mbta')">MBTA</button>
-                <button class="tab-button" onclick="switchTab('mta')">MTA</button>
+                <button class="tab-button" onclick="switchTab('mbta')">MBTA</button>
+                <button class="tab-button active" onclick="switchTab('mta')">MTA</button>
             </div>
             
             <!-- MBTA Tab Content -->
-            <div id="mbta-tab" class="tab-content active">
+            <div id="mbta-tab" class="tab-content">
                 <div class="agency-header">Massachusetts Bay Transportation Authority</div>
                 
                 <div class="filter-controls">
@@ -188,7 +188,7 @@
             </div>
             
             <!-- MTA Tab Content -->
-            <div id="mta-tab" class="tab-content">
+            <div id="mta-tab" class="tab-content active">
                 <div class="agency-header">Metropolitan Transportation Authority (New York)</div>
                 
                 <div class="filter-controls">
@@ -225,6 +225,40 @@
                                         </div>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td style="padding: 5px; font-size: 12px;">Metro North</td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-metro-north-paths" checked>
+                                    </td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-metro-north-live" checked>
+                                    </td>
+                                </tr>
+                                <tr id="metro-north-loading-indicator" style="display: none;">
+                                    <td colspan="3" style="padding: 5px; font-size: 11px; text-align: center; color: #003A70;">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                            <div style="width: 12px; height: 12px; border: 2px solid #003A70; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                            <span id="metro-north-loading-text">Loading Metro North routes...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 5px; font-size: 12px;">Subway</td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-mta-subway-paths" checked>
+                                    </td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-mta-subway-live" checked>
+                                    </td>
+                                </tr>
+                                <tr id="mta-subway-loading-indicator" style="display: none;">
+                                    <td colspan="3" style="padding: 5px; font-size: 11px; text-align: center; color: #EE352E;">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                            <div style="width: 12px; height: 12px; border: 2px solid #EE352E; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                            <span id="mta-subway-loading-text">Loading subway routes...</span>
+                                        </div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -239,7 +273,7 @@
     
 
     <!-- Include the MBTA stops data -->
-    <script src="mbta-stops-accurate.js"></script>
+    <script src="mbta-stops.js"></script>
     
     <!-- Include the MBTA bus data -->
     <script src="mbta-bus-data.js"></script>
@@ -259,6 +293,20 @@
         let lirrRoutesData = null;
     </script>
     <script src="lirr-routes-data.js" onerror="console.log('LIRR routes data not yet generated')"></script>
+    
+    <!-- Include Metro North data (if available) -->
+    <script>
+        // Placeholder for Metro North data - will be replaced when data file is generated
+        let metroNorthRoutesData = null;
+    </script>
+    <script src="metro-north-routes-data.js" onerror="console.log('Metro North routes data not yet generated')"></script>
+    
+    <!-- Include MTA Subway data (if available) -->
+    <script>
+        // Placeholder for MTA Subway data - will be replaced when data file is generated
+        let mtaSubwayRoutesData = null;
+    </script>
+    <script src="mta-subway-routes-data.js" onerror="console.log('MTA Subway routes data not yet generated')"></script>
 
     <!-- Tab switching functionality -->
     <script>
@@ -278,12 +326,12 @@
             // Update map view based on active transit system
             if (tabName === 'mbta') {
                 // Center on Boston
-                if (typeof map !== 'undefined') {
+                if (typeof map !== 'undefined' && map && typeof map.setView === 'function') {
                     map.setView([42.3601, -71.0589], 11);
                 }
             } else if (tabName === 'mta') {
                 // Center on New York City / Long Island
-                if (typeof map !== 'undefined') {
+                if (typeof map !== 'undefined' && map && typeof map.setView === 'function') {
                     map.setView([40.7589, -73.7250], 10); // Penn Station area with view of Long Island
                 }
             }

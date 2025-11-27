@@ -92,7 +92,7 @@ project/
 │   ├── shapes.txt
 │   └── ...
 │
-├── mbta-stops-accurate.js      # Generated data files
+├── mbta-stops.js      # Generated data files
 ├── mbta-bus-data.js
 ├── mbta-ferry-data.js
 ├── lirr-routes-data.js
