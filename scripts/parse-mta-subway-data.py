@@ -353,13 +353,46 @@ class MTASubwayDataParser:
         else:
             ordered_stops = []
         
+        # OPTIMIZATION: Only keep a minimal set of representative trips instead of all trips
+        # This dramatically reduces file size while still allowing trip matching
+        # Keep: 1) The longest trip (full route), 2) A few trips with different stop patterns
+        optimized_trip_stop_times = {}
+        
+        if trip_stop_times:
+            # Always keep the longest trip (most complete)
+            longest_trip_id, longest_trip_stops = longest_trip
+            optimized_trip_stop_times[longest_trip_id] = longest_trip_stops
+            
+            # Group trips by their stop sequence pattern (to find different directions/variants)
+            # Keep up to 3 additional trips with different patterns
+            trip_patterns = {}
+            for trip_id, stops in trip_stop_times.items():
+                if trip_id == longest_trip_id:
+                    continue
+                # Create a pattern key from the first and last few stops
+                if len(stops) >= 4:
+                    pattern_key = (
+                        stops[0]['stop_id'],
+                        stops[1]['stop_id'],
+                        stops[-2]['stop_id'],
+                        stops[-1]['stop_id']
+                    )
+                    if pattern_key not in trip_patterns:
+                        trip_patterns[pattern_key] = trip_id
+            
+            # Add up to 3 additional representative trips
+            for pattern_key, trip_id in list(trip_patterns.items())[:3]:
+                optimized_trip_stop_times[trip_id] = trip_stop_times[trip_id]
+        
         result = {
-            'trip_stop_times': dict(trip_stop_times),  # trip_id -> ordered stops
+            'trip_stop_times': optimized_trip_stop_times,  # Only representative trips (much smaller!)
             'avg_travel_times': avg_stop_times,  # (prev_stop_id, next_stop_id) -> seconds
             'ordered_stops': ordered_stops  # Most common stop order
         }
         
-        print(f"✅ Parsed {len(trip_stop_times)} trips, {len(avg_stop_times)} stop pairs")
+        print(f"✅ Parsed {len(trip_stop_times)} trips total")
+        print(f"   Keeping {len(optimized_trip_stop_times)} representative trips (optimized for file size)")
+        print(f"   Calculated {len(avg_stop_times)} average travel times between stop pairs")
         return result
     
     def parse_gtfs_time(self, time_str):
@@ -482,13 +515,15 @@ class MTASubwayDataParser:
             with open(filename, 'w', encoding='utf-8') as f:
                 f.write(f"// MTA Subway Data - Generated from GTFS\n")
                 f.write(f"{var_name} = ")
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                # Use compact JSON (no indentation) to reduce file size
+                json.dump(data, f, separators=(',', ':'), ensure_ascii=False)
                 f.write(";\n\n")
                 f.write("// Export for use in other files\n")
                 f.write("if (typeof module !== 'undefined' && module.exports) {\n")
                 f.write(f"    module.exports = {{ {var_name} }};\n")
                 f.write("}\n")
-            print(f"✅ Saved {filename}")
+            file_size_mb = Path(filename).stat().st_size / (1024 * 1024)
+            print(f"✅ Saved {filename} ({file_size_mb:.2f} MB)")
         except Exception as e:
             print(f"❌ Error saving {filename}: {e}")
     

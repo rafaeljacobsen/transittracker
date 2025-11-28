@@ -5929,7 +5929,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             } else {
                                 if (map.hasLayer(trainMarker)) {
                                     map.removeLayer(trainMarker);
-                                }
+                            }
                             }
                         }
                         
@@ -7124,8 +7124,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (shouldShow) {
                             if (!map.hasLayer(trainMarker)) {
                                 trainMarker.addTo(map);
-                            }
-                        } else {
+                                }
+                            } else {
                             if (map.hasLayer(trainMarker)) {
                                 map.removeLayer(trainMarker);
                             }
