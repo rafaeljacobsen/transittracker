@@ -58,6 +58,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const busStopToRoutes = new Map(); // Track which routes serve each bus stop
         const BUS_STOPS_MIN_ZOOM = 14; // Show bus stops at zoom level 14+
         
+        // Performance optimization: Cache marker collections for faster zoom updates
+        const stopMarkersCache = new Set(); // Cache all stop markers
+        const liveVehicleMarkersCache = new Set(); // Cache all live vehicle markers
+        
         // Check if data is ready before proceeding
         if (typeof mbtaStopsData === 'undefined' || !mbtaStopsData) {
             document.getElementById('map').innerHTML = '<div style="text-align: center; padding: 50px; font-size: 18px; color: #666;">Loading MBTA data...</div>';
@@ -68,13 +72,23 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize the map centered on New York/Long Island with canvas renderer for better performance
         map = L.map('map', {
             preferCanvas: true,  // Use canvas for better performance with many objects
-            renderer: L.canvas()
+            renderer: L.canvas(),
+            // Performance optimizations for smoother panning
+            zoomAnimation: true,
+            fadeAnimation: true,
+            markerZoomAnimation: false,  // Disable marker zoom animation for better performance
+            inertiaDeceleration: 2000,  // Smoother panning deceleration (higher = smoother)
+            inertiaMaxSpeed: Infinity,  // No speed limit for panning
+            maxBoundsViscosity: 0.0  // Disable bounds viscosity for smoother panning
         }).setView([40.7589, -73.7250], 10); // Start with MTA view (NYC/Long Island)
         
-        // Add OpenStreetMap tiles
+        // Add OpenStreetMap tiles with performance optimizations
         const osmTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: 'Â© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
+            maxZoom: 19,
+            keepBuffer: 2,  // Keep 2 rows/cols of tiles around viewport for smoother panning
+            updateWhenIdle: true,  // Only update tiles when panning stops (better performance)
+            updateWhenZooming: false  // Don't update during zoom animation
         });
         
         osmTiles.addTo(map);
@@ -139,9 +153,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to calculate icon size based on zoom level
         function getIconSize(baseSize, currentZoom) {
-            // Scale icon size based on zoom: smaller when zoomed out
+            // Scale icon size based on zoom: smaller when zoomed out, smaller when zoomed in too
             // More aggressive scaling for better visibility at different zoom levels
-            // Zoom 8: 40% size, Zoom 9: 50% size, Zoom 10: 60% size, Zoom 11: 75% size, Zoom 12+: 100% size
+            // Zoom 8: 40% size, Zoom 9: 50% size, Zoom 10: 60% size, Zoom 11: 75% size, Zoom 12: 80% size, Zoom 13: 75% size, Zoom 14+: 70% size (capped)
             if (currentZoom <= 8) {
                 return Math.round(baseSize * 0.4);
             } else if (currentZoom <= 9) {
@@ -150,15 +164,186 @@ document.addEventListener('DOMContentLoaded', function() {
                 return Math.round(baseSize * 0.6);
             } else if (currentZoom <= 11) {
                 return Math.round(baseSize * 0.75);
+            } else if (currentZoom <= 12) {
+                return Math.round(baseSize * 0.8);
+            } else if (currentZoom <= 13) {
+                return Math.round(baseSize * 0.75);
             } else {
-                return baseSize;
+                // Cap at 70% for very high zoom levels to prevent icons from getting too large
+                return Math.round(baseSize * 0.7);
             }
+        }
+        
+        // Generalized function to render route tracks (polylines)
+        function renderRouteTrack(coords, options = {}) {
+            if (!coords || coords.length < 2) {
+                return null;
+            }
+            
+            const {
+                color = '#666',
+                weight = 3,
+                opacity = 0.7,
+                pane = null,
+                popupText = null,
+                onClick = null
+            } = options;
+            
+            const polylineOptions = {
+                color: color,
+                weight: weight,
+                opacity: opacity
+            };
+            
+            if (pane) {
+                polylineOptions.pane = pane;
+            }
+            
+            const trackLine = L.polyline(coords, polylineOptions);
+            
+            if (popupText) {
+                trackLine.bindPopup(popupText);
+            }
+            
+            if (onClick) {
+                trackLine.on('click', onClick);
+            }
+            
+            return trackLine;
+        }
+        
+        // Generalized function to render stop markers (circle markers)
+        function renderStopMarker(coords, options = {}) {
+            if (!coords || !Array.isArray(coords) || coords.length < 2) {
+                return null;
+            }
+            
+            const {
+                radius = 5,
+                baseRadius = 5,
+                fillColor = '#666',
+                color = '#fff',
+                weight = 1.5,
+                opacity = 1,
+                fillOpacity = 0.8,
+                pane = 'stopsPane',
+                tooltipText = null,
+                tooltipDirection = 'top',
+                onClick = null,
+                interactive = true,
+                bubblingMouseEvents = false
+            } = options;
+            
+            const marker = L.circleMarker(coords, {
+                pane: pane,
+                radius: radius,
+                baseRadius: baseRadius,
+                fillColor: fillColor,
+                color: color,
+                weight: weight,
+                opacity: opacity,
+                fillOpacity: fillOpacity,
+                interactive: interactive,
+                bubblingMouseEvents: bubblingMouseEvents
+            });
+            
+            if (tooltipText) {
+                marker.bindTooltip(tooltipText, {
+                    direction: tooltipDirection,
+                    permanent: false,
+                    interactive: true,
+                    className: 'custom-tooltip'
+                });
+            }
+            
+            if (onClick) {
+                marker.on('click', onClick);
+            }
+            
+            // Add to cache for performance optimization
+            stopMarkersCache.add(marker);
+            
+            return marker;
+        }
+        
+        // Generalized function to render live vehicle markers
+        function renderLiveVehicleMarker(coords, options = {}) {
+            if (!coords || !Array.isArray(coords) || coords.length < 2) {
+                return null;
+            }
+            
+            const {
+                iconUrl = null,
+                iconSize = [12, 12],
+                baseIconSize = 12,
+                iconAnchor = null,
+                popupContent = null,
+                tooltipContent = null,
+                tooltipDirection = 'top',
+                routeName = null,
+                displayName = null,
+                routeId = null,
+                onClick = null,
+                zIndexOffset = 0
+            } = options;
+            
+            // Create icon if provided
+            let icon = null;
+            if (iconUrl) {
+                const anchor = iconAnchor || [iconSize[0] / 2, iconSize[1] / 2];
+                icon = L.icon({
+                    iconUrl: iconUrl,
+                    iconSize: iconSize,
+                    iconAnchor: anchor,
+                    baseIconSize: baseIconSize
+                });
+            }
+            
+            const markerOptions = {
+                icon: icon,
+                pane: 'markerPane'
+            };
+            
+            if (zIndexOffset !== 0) {
+                markerOptions.zIndexOffset = zIndexOffset;
+            }
+            
+            const marker = L.marker(coords, markerOptions);
+            
+            if (popupContent) {
+                marker.bindPopup(popupContent);
+            }
+            
+            if (tooltipContent) {
+                marker.bindTooltip(tooltipContent, {
+                    direction: tooltipDirection,
+                    permanent: false,
+                    interactive: true,
+                    className: 'custom-tooltip'
+                });
+            }
+            
+            // Store metadata
+            if (routeName !== null) marker.routeName = routeName;
+            if (displayName !== null) marker.displayName = displayName;
+            if (routeId !== null) marker.routeId = routeId;
+            
+            if (onClick) {
+                marker.on('click', onClick);
+            }
+            
+            // Add to cache for performance optimization
+            liveVehicleMarkersCache.add(marker);
+            
+            return marker;
         }
         
         // Add zoom handler for bus stops visibility and stop sizing
         map.on('zoomend', function() {
             const currentZoom = map.getZoom();
-            const shouldShowBusStops = currentZoom >= BUS_STOPS_MIN_ZOOM;
+            const zoomSufficient = currentZoom >= BUS_STOPS_MIN_ZOOM;
+            const busRoutesChecked = document.getElementById('show-bus-paths')?.checked || false;
+            const shouldShowBusStops = zoomSufficient && busRoutesChecked;
             
             // Only update if state changed
             if (shouldShowBusStops !== busStopsVisible) {
@@ -166,17 +351,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 toggleBusStopsVisibility(shouldShowBusStops);
             }
             
-            // Update all stop marker sizes based on zoom
-            map.eachLayer(function(layer) {
-                if (layer instanceof L.CircleMarker && layer.options.pane === 'stopsPane') {
-                    // Get the base radius from the marker's stored base radius
-                    const baseRadius = layer.options.baseRadius || 5;
+            // Update all stop marker sizes based on zoom - use cached collections for performance
+            // Only update markers that are actually on the map
+            stopMarkersCache.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    const baseRadius = marker.options.baseRadius || 5;
                     const newRadius = getStopRadius(baseRadius, currentZoom);
-                    layer.setRadius(newRadius);
+                    marker.setRadius(newRadius);
                 }
-                // Update live train/bus/ferry icon markers
-                else if (layer instanceof L.Marker && layer.options.icon) {
-                    const icon = layer.options.icon;
+            });
+            
+            // Update live vehicle icon markers - use cached collections for performance
+            liveVehicleMarkersCache.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    const icon = marker.options.icon;
                     const baseIconSize = icon.options.baseIconSize;
                     if (baseIconSize) {
                         const newSize = getIconSize(baseIconSize, currentZoom);
@@ -186,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             iconAnchor: [newSize / 2, newSize / 2],
                             baseIconSize: baseIconSize // Preserve base size
                         });
-                        layer.setIcon(newIcon);
+                        marker.setIcon(newIcon);
                     }
                 }
             });
@@ -1004,16 +1192,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                         pane = 'commuterRailPane';
                                     }
                                     
-                                    const trackLine = L.polyline(cleanCoords, {
+                                    const trackLine = renderRouteTrack(cleanCoords, {
                                         color: color,
                                         weight: 3,
                                         opacity: 0.7,
-                                        pane: pane
+                                        pane: pane,
+                                        popupText: `<b>${lineName}</b> Shape ${shapeIndex + 1} Track`
                                     });
                                     
-                                    trackLine.bindPopup(`<b>${lineName}</b> Shape ${shapeIndex + 1} Track`);
-                                    routeTracks.push(trackLine);
-                                    totalTracksDrawn++;
+                                    if (trackLine) {
+                                        routeTracks.push(trackLine);
+                                        totalTracksDrawn++;
+                                    }
                                 }
                             }
                         });
@@ -1062,65 +1252,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         const currentZoom = map.getZoom();
                         const radius = getStopRadius(baseRadius, currentZoom);
                         
-                        // Create a NEW marker for THIS line (each line gets its own marker instance)
-                        const marker = L.circleMarker(stop.coords, {
-                            pane: 'stopsPane',
-                            radius: radius,
-                            baseRadius: baseRadius, // Store for zoom updates
-                            fillColor: stopFillColor,
-                            color: '#fff',
-                            weight: 1.5,
-                            opacity: 1,
-                            fillOpacity: 0.8,
-                            colors: isMultiLine ? [color] : undefined,
-                            // Increase the interactive area for easier clicking
-                            interactive: true,
-                            bubblingMouseEvents: false
-                        });
-                        
-                        // Create a larger invisible hit area for easier clicking
-                        const hitRadius = 15; // Larger click radius
-                        marker.on('add', function() {
-                            const element = marker.getElement();
-                            if (element) {
-                                // Increase the pointer-events area
-                                element.style.pointerEvents = 'auto';
-                                element.style.cursor = 'pointer';
-                                // Add padding to make click area larger
-                                const currentRadius = parseFloat(element.getAttribute('r') || '6');
-                                element.setAttribute('data-original-radius', currentRadius);
-                                // Create larger invisible circle for clicking
-                                const parent = element.parentElement;
-                                if (parent) {
-                                    const hitCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                                    hitCircle.setAttribute('cx', element.getAttribute('cx'));
-                                    hitCircle.setAttribute('cy', element.getAttribute('cy'));
-                                    hitCircle.setAttribute('r', hitRadius);
-                                    hitCircle.setAttribute('fill', 'transparent');
-                                    hitCircle.setAttribute('stroke', 'none');
-                                    hitCircle.style.pointerEvents = 'auto';
-                                    hitCircle.style.cursor = 'pointer';
-                                    parent.insertBefore(hitCircle, element);
-                                }
-                            }
-                        });
-                        
                         const popupText = isMultiLine ? 
                             `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: ${stop.type}<br>Lines: ${stopRoutes.join(', ')}<br>Coordinates: ${stop.coords[0].toFixed(6)}, ${stop.coords[1].toFixed(6)}</div>` :
                             `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: ${stop.type}<br>Line: ${lineName}<br>Coordinates: ${stop.coords[0].toFixed(6)}, ${stop.coords[1].toFixed(6)}</div>`;
                         
-                        // Use tooltip for all stops, direction based on latitude
+                        // Use tooltip direction based on latitude
                         const tooltipDirection = stop.coords[0] < 42.361220 ? 'bottom' : 'top';
-                        marker.bindTooltip(popupText, { 
-                            direction: tooltipDirection,
-                            permanent: false,
-                            interactive: true,
-                            className: 'custom-tooltip'
-                        });
                         
-                        // Add click handler for all subway and commuter rail stops
+                        // Create click handler for all subway and commuter rail stops
+                        let onClickHandler = null;
                         if (stop.type === 'Subway' || stop.type === 'Commuter Rail') {
-                            marker.on('click', function(e) {
+                            onClickHandler = function(e) {
                                 // Prevent map click from firing
                                 L.DomEvent.stopPropagation(e);
                                 
@@ -1151,11 +1293,64 @@ document.addEventListener('DOMContentLoaded', function() {
                                 } else {
                                     highlightMultipleLines(servingRoutes);
                                 }
+                            };
+                        }
+                        
+                        // Create marker using generalized function
+                        const marker = renderStopMarker(stop.coords, {
+                            radius: radius,
+                            baseRadius: baseRadius,
+                            fillColor: stopFillColor,
+                            color: '#fff',
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.8,
+                            pane: 'stopsPane',
+                            tooltipText: popupText,
+                            tooltipDirection: tooltipDirection,
+                            onClick: onClickHandler,
+                            interactive: true,
+                            bubblingMouseEvents: false
+                        });
+                        
+                        // Add custom properties if needed (colors for multi-line)
+                        if (isMultiLine && marker) {
+                            marker.options.colors = [color];
+                        }
+                        
+                        // Create a larger invisible hit area for easier clicking (preserve existing behavior)
+                        if (marker) {
+                            const hitRadius = 15; // Larger click radius
+                            marker.on('add', function() {
+                                const element = marker.getElement();
+                                if (element) {
+                                    // Increase the pointer-events area
+                                    element.style.pointerEvents = 'auto';
+                                    element.style.cursor = 'pointer';
+                                    // Add padding to make click area larger
+                                    const currentRadius = parseFloat(element.getAttribute('r') || '6');
+                                    element.setAttribute('data-original-radius', currentRadius);
+                                    // Create larger invisible circle for clicking
+                                    const parent = element.parentElement;
+                                    if (parent) {
+                                        const hitCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                                        hitCircle.setAttribute('cx', element.getAttribute('cx'));
+                                        hitCircle.setAttribute('cy', element.getAttribute('cy'));
+                                        hitCircle.setAttribute('r', hitRadius);
+                                        hitCircle.setAttribute('fill', 'transparent');
+                                        hitCircle.setAttribute('stroke', 'none');
+                                        hitCircle.style.pointerEvents = 'auto';
+                                        hitCircle.style.cursor = 'pointer';
+                                        parent.insertBefore(hitCircle, element);
+                                    }
+                                }
                             });
                         }
                         
-                        routeMarkers.push(marker);
-                        totalStopsDrawn++;
+                        if (marker) {
+                            routeMarkers.push(marker);
+                            totalStopsDrawn++;
+                        }
                     });
                     
                     return { markers: routeMarkers, tracks: routeTracks };
@@ -1187,7 +1382,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Process next chunk if there are more routes
                     if (endIndex < routes.length) {
-                        setTimeout(() => processChunk(endIndex), 10); // 10ms delay between chunks
+                        requestAnimationFrame(() => processChunk(endIndex)); // Use requestAnimationFrame for smoother rendering
                     } else {
         
                     }
@@ -1224,32 +1419,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (ferryRouteShapes[lineName] && ferryRouteShapes[lineName].length > 0) {
                         ferryRouteShapes[lineName].forEach((shape, shapeIndex) => {
                             if (shape.coords && shape.coords.length > 1) {
-                                const trackLine = L.polyline(shape.coords, {
+                                const trackLine = renderRouteTrack(shape.coords, {
                                     color: color,
                                     weight: 3,
                                     opacity: 0.8,
-                                    pane: 'ferryPane'
+                                    pane: 'ferryPane',
+                                    popupText: `<b>Ferry Route ${lineName}</b> Shape ${shapeIndex + 1}`
                                 });
                                 
-                                trackLine.bindPopup(`<b>Ferry Route ${lineName}</b> Shape ${shapeIndex + 1}`);
-                                routeTracks.push(trackLine);
+                                if (trackLine) {
+                                    routeTracks.push(trackLine);
+                                }
                             }
                         });
                     }
                     
                     // Process ferry stop markers
                     stops.forEach(stop => {
-                        const marker = L.circleMarker(stop.coords, {
-                            pane: 'stopsPane',
-                            radius: 6,
-                            fillColor: color,
-                            color: '#fff',
-                            weight: 2,
-                            opacity: 1,
-                            fillOpacity: 0.9
-                        });
-                        
-                        // Use tooltip for all stops, direction based on latitude
                         const stopContent = `
                             <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;">
                                 <b>${stop.name}</b><br>
@@ -1259,14 +1445,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         `;
                         const tooltipDirection = stop.coords[0] < 42.361220 ? 'bottom' : 'top';
-                        marker.bindTooltip(stopContent, { 
-                            direction: tooltipDirection,
-                            permanent: false,
-                            interactive: true,
-                            className: 'custom-tooltip'
+                        
+                        const marker = renderStopMarker(stop.coords, {
+                            radius: 6,
+                            baseRadius: 6,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9,
+                            pane: 'stopsPane',
+                            tooltipText: stopContent,
+                            tooltipDirection: tooltipDirection
                         });
                         
-                        routeMarkers.push(marker);
+                        if (marker) {
+                            routeMarkers.push(marker);
+                        }
                     });
                     
                     // Add markers and tracks to layers
@@ -1287,37 +1482,47 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to load a single route (bus, shuttle, or silver line)
         function loadSingleRoute(routeKey, routeType = 'bus') {
+            // CRITICAL: Convert routeKey to string to ensure consistent key matching
+            // JavaScript object keys are always strings, but routeKey might be a number
+            const routeKeyStr = String(routeKey);
+            
             // Check if the layer already exists and has content
-            if (layers[routeKey] && layers[routeKey].getLayers().length > 0) {
+            if (layers[routeKeyStr] && layers[routeKeyStr].getLayers().length > 0) {
                 return;
             }
             
             // Create layer if it doesn't exist
-            if (!layers[routeKey]) {
-                layers[routeKey] = L.layerGroup();
+            if (!layers[routeKeyStr]) {
+                layers[routeKeyStr] = L.layerGroup();
             }
             
             let routeData = null;
             let routeShapes = null;
             let color = '#FFD700';
-            let displayName = routeKey;
+            let displayName = routeKeyStr;
             
             // Get data based on route type
             if (routeType === 'bus') {
-                routeData = mbtaBusData[routeKey];
-                routeShapes = typeof busRouteShapes !== 'undefined' ? busRouteShapes[routeKey] : null;
-                color = lineColors[routeKey] || '#FFD700';
-                displayName = `Bus Route ${routeKey}`;
+                routeData = mbtaBusData[routeKeyStr];
+                routeShapes = typeof busRouteShapes !== 'undefined' ? busRouteShapes[routeKeyStr] : null;
+                // CRITICAL: Check if this is actually a bus route in mbtaBusData before using lineColors
+                // MTA subway routes also use single-digit IDs ("1", "2", "3") and would overwrite bus colors
+                if (mbtaBusData[routeKeyStr] && !mtaSubwayLines.includes(routeKeyStr)) {
+                    color = lineColors[routeKeyStr] || '#FFD700';
+                } else {
+                    color = '#FFD700'; // Default bus yellow - don't use MTA subway colors
+                }
+                displayName = `Bus Route ${routeKeyStr}`;
             } else if (routeType === 'shuttle') {
-                routeData = mbtaShuttleData[routeKey];
-                routeShapes = typeof shuttleRouteShapes !== 'undefined' ? shuttleRouteShapes[routeKey] : null;
-                color = lineColors[routeKey] || '#FF6B6B';
-                displayName = `Shuttle ${routeKey}`;
+                routeData = mbtaShuttleData[routeKeyStr];
+                routeShapes = typeof shuttleRouteShapes !== 'undefined' ? shuttleRouteShapes[routeKeyStr] : null;
+                color = lineColors[routeKeyStr] || '#FF6B6B';
+                displayName = `Shuttle ${routeKeyStr}`;
             } else if (routeType === 'silver') {
-                routeData = silverLineData[routeKey];
-                routeShapes = typeof silverLineShapes !== 'undefined' ? silverLineShapes[routeKey] : null;
-                color = lineColors[routeKey] || '#7C878E';
-                displayName = `Silver Line ${routeKey}`;
+                routeData = silverLineData[routeKeyStr];
+                routeShapes = typeof silverLineShapes !== 'undefined' ? silverLineShapes[routeKeyStr] : null;
+                color = lineColors[routeKeyStr] || '#7C878E';
+                displayName = `Silver Line ${routeKeyStr}`;
             }
             
             // Load route shapes if available
@@ -1342,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             pane: 'busPane'
                         });
                         trackLine.bindPopup(`<b>${displayName}</b>`);
-                        layers[routeKey].addLayer(trackLine);
+                        layers[routeKeyStr].addLayer(trackLine);
                     }
                 });
             }
@@ -1369,7 +1574,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             busRoutesLoading = true;
             const busRoutes = Object.keys(mbtaBusData).filter(lineName => {
-                return !mbtaStopsData || !mbtaStopsData[lineName];
+                // CRITICAL: Check both string and numeric keys to handle type mismatches
+                return !mbtaStopsData || (!mbtaStopsData[lineName] && !mbtaStopsData[Number(lineName)]);
             });
             
             
@@ -1390,7 +1596,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 for (let i = currentIndex; i < endIndex; i++) {
                     const lineName = busRoutes[i];
                     const stops = mbtaBusData[lineName];
-                    const color = lineColors[lineName] || '#FFD700';
+                    // CRITICAL: Don't use lineColors if this route ID matches an MTA subway line
+                    // MTA subway routes use single-digit IDs ("1", "2", "3") which would overwrite bus colors
+                    const color = (mbtaBusData[lineName] && !mtaSubwayLines.includes(lineName) && lineColors[lineName]) 
+                        ? lineColors[lineName] 
+                        : '#FFD700'; // Default bus yellow
                     
                     // ONLY render route shapes if available - skip individual stop markers for performance
                     if (typeof busRouteShapes !== 'undefined' && busRouteShapes[lineName] && busRouteShapes[lineName].length > 0) {
@@ -1407,13 +1617,29 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             
                             if (coords && coords.length > 1) {
-                                const trackLine = L.polyline(coords, {
+                                const trackLine = renderRouteTrack(coords, {
                                     color: color,
                                     weight: 4,
-                                    opacity: 1.0
+                                    opacity: 1.0,
+                                    pane: 'busPane',
+                                    popupText: `<b>Bus Route ${lineName}</b>`,
+                                    onClick: function(e) {
+                                        L.DomEvent.stopPropagation(e);
+                                        
+                                        // Toggle highlighting for this specific route only
+                                        if (isLineHighlighted(lineName)) {
+                                            resetHighlight();
+                                        } else {
+                                            // Load the route if not already loaded
+                                            loadSingleRoute(lineName, 'bus');
+                                            highlightLine(lineName);
+                                        }
+                                    }
                                 });
-                                trackLine.bindPopup(`<b>Bus Route ${lineName}</b>`);
-                                layers[lineName].addLayer(trackLine);
+                                
+                                if (trackLine) {
+                                    layers[lineName].addLayer(trackLine);
+                                }
                             }
                         });
                     }
@@ -1437,7 +1663,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Process next chunk if there are more routes
                 if (currentIndex < busRoutes.length) {
-                    setTimeout(() => processChunk(), 10); // 10ms delay between chunks
+                    requestAnimationFrame(() => processChunk()); // Use requestAnimationFrame for smoother rendering
                 } else {
                     busRoutesLoaded = true;
                     busRoutesLoading = false;
@@ -1464,7 +1690,8 @@ document.addEventListener('DOMContentLoaded', function() {
             busStopToRoutes.clear();
             Object.keys(mbtaBusData).forEach(lineName => {
                 // Skip if this is a subway line (in mbtaStopsData)
-                if (mbtaStopsData && mbtaStopsData[lineName]) return;
+                // CRITICAL: Check both string and numeric keys to handle type mismatches
+                if (mbtaStopsData && (mbtaStopsData[lineName] || mbtaStopsData[Number(lineName)])) return;
                 
                 const stops = mbtaBusData[lineName];
                 stops.forEach(stop => {
@@ -1481,10 +1708,15 @@ document.addEventListener('DOMContentLoaded', function() {
             // Second pass: Create markers - separate marker instance for each route
             Object.keys(mbtaBusData).forEach(lineName => {
                 // Skip if this is a subway line (in mbtaStopsData)
-                if (mbtaStopsData && mbtaStopsData[lineName]) return;
+                // CRITICAL: Check both string and numeric keys to handle type mismatches
+                if (mbtaStopsData && (mbtaStopsData[lineName] || mbtaStopsData[Number(lineName)])) return;
                 
                 const stops = mbtaBusData[lineName];
-                const color = lineColors[lineName] || '#FFD700';
+                // CRITICAL: Don't use lineColors if this route ID matches an MTA subway line
+                // MTA subway routes use single-digit IDs ("1", "2", "3") which would overwrite bus colors
+                const color = (mbtaBusData[lineName] && !mtaSubwayLines.includes(lineName) && lineColors[lineName]) 
+                    ? lineColors[lineName] 
+                    : '#FFD700'; // Default bus yellow
                 
                 if (!busStopLayers.has(lineName)) {
                     busStopLayers.set(lineName, L.layerGroup());
@@ -1525,36 +1757,37 @@ document.addEventListener('DOMContentLoaded', function() {
                         className: 'custom-tooltip'
                     });
                     
-                    // Add click handler to highlight all serving routes
+                    // Add click handler to highlight this specific route only
+                    // Each stop marker is created for a specific route (lineName), so highlight only that route
                     marker.on('click', function(e) {
                         // Prevent map click from firing
                         L.DomEvent.stopPropagation(e);
                         
-                        // Get all routes serving this stop
-                        const routes = busStopToRoutes.get(stopKey) || [lineName];
+                        // Highlight only this specific route, not all routes serving the stop
+                        const routeToHighlight = lineName;
                         
-                        // Check if these routes are already highlighted
-                        const alreadyHighlighted = Array.isArray(highlightedLine) 
-                            ? JSON.stringify(highlightedLine.sort()) === JSON.stringify(routes.sort())
-                            : highlightedLine === routes[0] && routes.length === 1;
+                        // Check if this route is already highlighted
+                        const alreadyHighlighted = isLineHighlighted(routeToHighlight);
                         
-                        // If something else is already highlighted, check if this is part of it
+                        // If something else is already highlighted, check if this route is part of it
                         if (highlightedLine && !alreadyHighlighted) {
                             const isCurrentlyDimmed = Array.isArray(highlightedLine)
-                                ? !routes.some(route => highlightedLine.includes(route))
-                                : !routes.includes(highlightedLine);
+                                ? !highlightedLine.includes(routeToHighlight)
+                                : highlightedLine !== routeToHighlight;
                             
                             if (isCurrentlyDimmed) {
-                                // Don't allow highlighting a dimmed stop - do nothing
+                                // Don't allow highlighting a dimmed route - do nothing
                                 return;
                             }
                         }
                         
-                        // If clicking the same stop/routes, reset; otherwise highlight
+                        // If clicking the same route, reset; otherwise highlight just this route
                         if (alreadyHighlighted) {
                             resetHighlight();
                         } else {
-                            highlightMultipleLines(routes);
+                            // Load the route if not already loaded
+                            loadSingleRoute(routeToHighlight, 'bus');
+                            highlightLine(routeToHighlight);
                         }
                     });
                     
@@ -1566,7 +1799,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to toggle bus stops visibility
         function toggleBusStopsVisibility(show) {
-            if (show) {
+            // Always check checkbox state - don't show if checkbox is unchecked
+            const busRoutesChecked = document.getElementById('show-bus-paths')?.checked || false;
+            const zoomSufficient = map.getZoom() >= BUS_STOPS_MIN_ZOOM;
+            const shouldShow = show && busRoutesChecked && zoomSufficient;
+            
+            if (shouldShow) {
                 // Create stops if they don't exist yet
                 if (busStopLayers.size === 0) {
                     createBusStopMarkers();
@@ -1712,28 +1950,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         let coords = shape.coords;
                         
                         if (coords && Array.isArray(coords) && coords.length > 1) {
-                            const trackLine = L.polyline(coords, {
+                            const trackLine = renderRouteTrack(coords, {
                                 color: color,
                                 weight: 4,
                                 opacity: 0.8,
-                                pane: 'lirrPane'
-                            });
-                            
-                            trackLine.bindPopup(`<b>LIRR: ${lineName}</b><br>Route ID: ${route.route_id || 'N/A'}`);
-                            
-                            // Add click handler for highlighting
-                            trackLine.on('click', function(e) {
-                                L.DomEvent.stopPropagation(e);
-                                
-                                // Toggle highlighting
-                                if (highlightedLIRRLine === lineName) {
-                                    resetLIRRHighlight();
-                                } else {
-                                    highlightLIRRLine(lineName);
+                                pane: 'lirrPane',
+                                popupText: `<b>LIRR: ${lineName}</b><br>Route ID: ${route.route_id || 'N/A'}`,
+                                onClick: function(e) {
+                                    L.DomEvent.stopPropagation(e);
+                                    
+                                    // Toggle highlighting
+                                    if (highlightedLIRRLine === lineName) {
+                                        resetLIRRHighlight();
+                                    } else {
+                                        highlightLIRRLine(lineName);
+                                    }
                                 }
                             });
                             
-                            layers[lineName].addLayer(trackLine);
+                            if (trackLine) {
+                                layers[lineName].addLayer(trackLine);
+                            }
                         }
                     });
                 }
@@ -1927,28 +2164,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         let coords = shape.coords;
                         
                         if (coords && Array.isArray(coords) && coords.length > 1) {
-                            const trackLine = L.polyline(coords, {
+                            const trackLine = renderRouteTrack(coords, {
                                 color: color,
                                 weight: 4,
                                 opacity: 0.8,
-                                pane: 'metroNorthPane'
-                            });
-                            
-                            trackLine.bindPopup(`<b>Metro North: ${lineName}</b><br>Route ID: ${route.route_id || 'N/A'}<br>Shape ID: ${shape.shape_id || 'N/A'}<br>Points: ${coords.length}`);
-                            
-                            // Add click handler for highlighting
-                            trackLine.on('click', function(e) {
-                                L.DomEvent.stopPropagation(e);
-                                
-                                // Toggle highlighting
-                                if (highlightedMetroNorthLine === lineName) {
-                                    resetMetroNorthHighlight();
-                                } else {
-                                    highlightMetroNorthLine(lineName);
+                                pane: 'metroNorthPane',
+                                popupText: `<b>Metro North: ${lineName}</b><br>Route ID: ${route.route_id || 'N/A'}<br>Shape ID: ${shape.shape_id || 'N/A'}<br>Points: ${coords.length}`,
+                                onClick: function(e) {
+                                    L.DomEvent.stopPropagation(e);
+                                    
+                                    // Toggle highlighting
+                                    if (highlightedMetroNorthLine === lineName) {
+                                        resetMetroNorthHighlight();
+                                    } else {
+                                        highlightMetroNorthLine(lineName);
+                                    }
                                 }
                             });
                             
-                            layers[lineName].addLayer(trackLine);
+                            if (trackLine) {
+                                layers[lineName].addLayer(trackLine);
+                            }
                         }
                     });
                 }
@@ -2022,20 +2258,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         const currentZoom = map.getZoom();
                         const radius = getStopRadius(baseRadius, currentZoom);
                         
-                        // Create a NEW station marker for THIS route (each route gets its own marker instance)
-                        const stationMarker = L.circleMarker([stop.lat, stop.lon], {
-                            radius: radius,
-                            baseRadius: baseRadius, // Store for zoom updates
-                            fillColor: fillColor,
-                            color: '#fff',
-                            weight: 1.5,
-                            opacity: 1,
-                            fillOpacity: 0.8,
-                            pane: 'stopsPane',
-                            interactive: true,
-                            bubblingMouseEvents: false
-                        });
-                        
                         // Build tooltip with all serving routes (matching MBTA style)
                         const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
                         const tooltipText = isMultiRoute ? 
@@ -2044,15 +2266,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Use tooltip direction based on latitude (matching MBTA style)
                         const tooltipDirection = stop.lat < 40.76 ? 'bottom' : 'top';
-                        stationMarker.bindTooltip(tooltipText, { 
-                            direction: tooltipDirection,
-                            permanent: false,
-                            interactive: true,
-                            className: 'custom-tooltip'
-                        });
                         
-                        // Add click handler for highlighting
-                        stationMarker.on('click', function(e) {
+                        // Create click handler for highlighting
+                        const onClickHandler = function(e) {
                             L.DomEvent.stopPropagation(e);
                             
                             // Get all routes serving this stop
@@ -2086,10 +2302,27 @@ document.addEventListener('DOMContentLoaded', function() {
                                     highlightMetroNorthLine(servingRoutes[0]);
                                 }
                             }
+                        };
+                        
+                        // Create marker using generalized function
+                        const stationMarker = renderStopMarker([stop.lat, stop.lon], {
+                            radius: radius,
+                            baseRadius: baseRadius,
+                            fillColor: fillColor,
+                            color: '#fff',
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.8,
+                            pane: 'stopsPane',
+                            tooltipText: tooltipText,
+                            tooltipDirection: tooltipDirection,
+                            onClick: onClickHandler,
+                            interactive: true,
+                            bubblingMouseEvents: false
                         });
                         
                         // Add this marker to this route's layer
-                        if (layers[lineName]) {
+                        if (layers[lineName] && stationMarker) {
                             layers[lineName].addLayer(stationMarker);
                         }
                     }
@@ -2145,53 +2378,45 @@ document.addEventListener('DOMContentLoaded', function() {
                         let coords = shape.coords;
                         
                         if (coords && Array.isArray(coords) && coords.length > 1) {
+                            // Create click handler for highlighting (shared by both lines)
+                            const onClickHandler = function(e) {
+                                L.DomEvent.stopPropagation(e);
+                                
+                                // Toggle highlighting
+                                if (highlightedSubwayLine === lineName) {
+                                    resetSubwayHighlight();
+                                } else {
+                                    highlightSubwayLine(lineName);
+                                }
+                            };
+                            
                             // Create the colored outer track line
-                            const trackLine = L.polyline(coords, {
+                            const trackLine = renderRouteTrack(coords, {
                                 color: color,
                                 weight: 5,
                                 opacity: 0.9,
-                                pane: 'subwayPane'
+                                pane: 'subwayPane',
+                                popupText: `<b>MTA Subway: ${lineName} Line</b><br>${route.long_name || ''}`,
+                                onClick: onClickHandler
                             });
                             
                             // Create a black center line to distinguish subway from commuter rail
-                            const centerLine = L.polyline(coords, {
+                            const centerLine = renderRouteTrack(coords, {
                                 color: 'black',
                                 weight: 1.5,
                                 opacity: 0.6,
                                 pane: 'subwayPane',
-                                lineCap: 'round',
-                                lineJoin: 'round'
-                            });
-                            
-                            trackLine.bindPopup(`<b>MTA Subway: ${lineName} Line</b><br>${route.long_name || ''}`);
-                            
-                            // Add click handler for highlighting
-                            trackLine.on('click', function(e) {
-                                L.DomEvent.stopPropagation(e);
-                                
-                                // Toggle highlighting
-                                if (highlightedSubwayLine === lineName) {
-                                    resetSubwayHighlight();
-                                } else {
-                                    highlightSubwayLine(lineName);
-                                }
-                            });
-                            
-                            centerLine.on('click', function(e) {
-                                L.DomEvent.stopPropagation(e);
-                                
-                                // Toggle highlighting
-                                if (highlightedSubwayLine === lineName) {
-                                    resetSubwayHighlight();
-                                } else {
-                                    highlightSubwayLine(lineName);
-                                }
+                                onClick: onClickHandler
                             });
                             
                             // Add track line first, then center line on top
                             if (layers[lineName]) {
-                                layers[lineName].addLayer(trackLine);
-                                layers[lineName].addLayer(centerLine);
+                                if (trackLine) {
+                                    layers[lineName].addLayer(trackLine);
+                                }
+                                if (centerLine) {
+                                    layers[lineName].addLayer(centerLine);
+                                }
                             }
                         }
                     });
@@ -2264,20 +2489,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         const currentZoom = map.getZoom();
                         const radius = getStopRadius(baseRadius, currentZoom);
                         
-                        // Create a NEW station marker for THIS route (each route gets its own marker instance)
-                        const stationMarker = L.circleMarker([stop.lat, stop.lon], {
-                            radius: radius,
-                            baseRadius: baseRadius,
-                            fillColor: fillColor,
-                            color: '#fff',
-                            weight: 0.8,
-                            opacity: 1,
-                            fillOpacity: 0.8,
-                            pane: 'stopsPane',
-                            interactive: true,
-                            bubblingMouseEvents: false
-                        });
-                        
                         // Build tooltip
                         const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
                         const tooltipText = isMultiRoute ? 
@@ -2285,15 +2496,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Subway<br>Line: ${routesText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>`;
                         
                         const tooltipDirection = stop.lat < 40.76 ? 'bottom' : 'top';
-                        stationMarker.bindTooltip(tooltipText, { 
-                            direction: tooltipDirection,
-                            permanent: false,
-                            interactive: true,
-                            className: 'custom-tooltip'
-                        });
                         
-                        // Add click handler for highlighting
-                        stationMarker.on('click', function(e) {
+                        // Create click handler for highlighting
+                        const onClickHandler = function(e) {
                             L.DomEvent.stopPropagation(e);
                             
                             // Get all routes serving this stop
@@ -2314,10 +2519,27 @@ document.addEventListener('DOMContentLoaded', function() {
                                     highlightSubwayLine(servingRoutes[0]);
                                 }
                             }
+                        };
+                        
+                        // Create marker using generalized function
+                        const stationMarker = renderStopMarker([stop.lat, stop.lon], {
+                            radius: radius,
+                            baseRadius: baseRadius,
+                            fillColor: fillColor,
+                            color: '#fff',
+                            weight: 0.8,
+                            opacity: 1,
+                            fillOpacity: 0.8,
+                            pane: 'stopsPane',
+                            tooltipText: tooltipText,
+                            tooltipDirection: tooltipDirection,
+                            onClick: onClickHandler,
+                            interactive: true,
+                            bubblingMouseEvents: false
                         });
                         
                         // Add this marker to this route's layer
-                        if (layers[lineName]) {
+                        if (layers[lineName] && stationMarker) {
                             layers[lineName].addLayer(stationMarker);
                         }
                     }
@@ -2347,14 +2569,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof silverLineShapes !== 'undefined' && silverLineShapes[lineName] && silverLineShapes[lineName].length > 0) {
                     silverLineShapes[lineName].forEach((shape, shapeIndex) => {
                         if (shape.coords && Array.isArray(shape.coords) && shape.coords.length > 1) {
-                            const trackLine = L.polyline(shape.coords, {
+                            const trackLine = renderRouteTrack(shape.coords, {
                                 color: color,
                                 weight: 4,
                                 opacity: 0.7,
-                                pane: 'silverLinePane'
+                                pane: 'silverLinePane',
+                                popupText: `<b>Silver Line ${lineName}</b>`
                             });
-                            trackLine.bindPopup(`<b>Silver Line ${lineName}</b>`);
-                            layers[lineName].addLayer(trackLine);
+                            
+                            if (trackLine && layers[lineName]) {
+                                layers[lineName].addLayer(trackLine);
+                            }
                         }
                     });
                 }
@@ -2363,22 +2588,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (stops && Array.isArray(stops)) {
                     stops.forEach(stop => {
                         if (stop.coords && stop.coords.length === 2) {
-                            const stopMarker = L.circleMarker([stop.coords[0], stop.coords[1]], {
-                                pane: 'stopsPane',
+                            const tooltipText = `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Silver Line ${lineName}</div>`;
+                            const tooltipDirection = stop.coords[0] < 42.361220 ? 'bottom' : 'top';
+                            
+                            const stopMarker = renderStopMarker([stop.coords[0], stop.coords[1]], {
                                 radius: 4,
+                                baseRadius: 4,
                                 fillColor: color,
                                 color: color,
                                 weight: 1,
                                 opacity: 1,
-                                fillOpacity: 0.8
+                                fillOpacity: 0.8,
+                                pane: 'stopsPane',
+                                tooltipText: tooltipText,
+                                tooltipDirection: tooltipDirection
                             });
-                            stopMarker.bindTooltip(`<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Silver Line ${lineName}</div>`, {
-                                direction: stop.coords[0] < 42.361220 ? 'bottom' : 'top',
-                                permanent: false,
-                                interactive: true,
-                                className: 'custom-tooltip'
-                            });
-                            layers[lineName].addLayer(stopMarker);
+                            
+                            if (stopMarker && layers[lineName]) {
+                                layers[lineName].addLayer(stopMarker);
+                            }
                         }
                     });
                 }
@@ -2393,23 +2621,28 @@ document.addEventListener('DOMContentLoaded', function() {
         // Helper function to check if a line is currently highlighted
         function isLineHighlighted(lineName) {
             if (!highlightedLine) return false;
+            // CRITICAL: Convert to string for consistent comparison
+            const lineNameStr = String(lineName);
             if (Array.isArray(highlightedLine)) {
-                return highlightedLine.length === 1 && highlightedLine[0] === lineName;
+                return highlightedLine.length === 1 && String(highlightedLine[0]) === lineNameStr;
             }
-            return highlightedLine === lineName;
+            return String(highlightedLine) === lineNameStr;
         }
         
         // Function to highlight multiple lines (for multi-line stops)
         function highlightMultipleLines(lineNames) {
             if (!Array.isArray(lineNames) || lineNames.length === 0) return;
             
+            // CRITICAL: Convert all line names to strings to ensure consistent key matching
+            const lineNamesStr = lineNames.map(name => String(name));
+            
             // Store as array if multiple, or single string if one
-            highlightedLine = lineNames.length === 1 ? lineNames[0] : lineNames;
+            highlightedLine = lineNamesStr.length === 1 ? lineNamesStr[0] : lineNamesStr;
             highlightedLIRRLine = null; // Clear LIRR highlighting
             highlightedMetroNorthLine = null; // Clear Metro North highlighting
             
             // Always show highlighted lines (even if checkbox is off)
-            lineNames.forEach(lineName => {
+            lineNamesStr.forEach(lineName => {
                 if (layers[lineName] && !map.hasLayer(layers[lineName])) {
                     map.addLayer(layers[lineName]);
                 }
@@ -2425,162 +2658,204 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Remove dimmed layers from map or show highlighted ones
+            // Remove dimmed layers from map or show highlighted ones - batch operations for performance
+            const layersToRemove = [];
+            const layersToAdd = [];
+            
             Object.keys(layers).forEach(layerName => {
-                const isDimmed = !lineNames.includes(layerName);
+                // CRITICAL: Check if this is an MBTA bus route first
+                // If it's in mbtaBusData, it's an MBTA bus route and should be dimmed (not skipped)
+                const isMBTABus = typeof mbtaBusData !== 'undefined' && mbtaBusData && mbtaBusData[layerName];
                 
-                if (isDimmed) {
-                    // Remove dimmed layer from map
-                    if (map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
+                // Only skip if it's NOT an MBTA bus route AND it's an MTA subway route
+                // This prevents MBTA bus routes (like "1" and "4") from being skipped just because
+                // they share the same ID with MTA subway routes
+                if (!isMBTABus) {
+                    const isMTASubway = typeof mtaSubwayRoutesData !== 'undefined' && mtaSubwayRoutesData && mtaSubwayRoutesData.routes && mtaSubwayRoutesData.routes[layerName];
+                    if (isMTASubway || lirrLines.includes(layerName) || metroNorthLines.includes(layerName)) {
+                        return;
                     }
-                } else {
-                    // Ensure highlighted layer is on map
-                    if (!map.hasLayer(layers[layerName])) {
-                        map.addLayer(layers[layerName]);
-                    }
+                }
+                
+                // MBTA subway/commuter rail lines (in mbtaStopsData) should be dimmed like any other MBTA line
+                // Only skip non-MBTA systems (MTA, LIRR, Metro North)
+                
+                const isDimmed = !lineNamesStr.includes(layerName);
+                const layer = layers[layerName];
+                const isOnMap = map.hasLayer(layer);
+                
+                if (isDimmed && isOnMap) {
+                    layersToRemove.push(layer);
+                } else if (!isDimmed && !isOnMap) {
+                    layersToAdd.push(layer);
                 }
             });
             
-            // Also handle bus stop layers separately - remove dimmed ones, show highlighted ones
+            // Batch remove operations
+            layersToRemove.forEach(layer => map.removeLayer(layer));
+            // Batch add operations
+            layersToAdd.forEach(layer => map.addLayer(layer));
+            
+            // Also handle bus stop layers separately - batch operations for performance
+            const busStopsToRemove = [];
+            const busStopsToAdd = [];
             busStopLayers.forEach((layer, layerName) => {
-                const isDimmed = !lineNames.includes(layerName);
+                const isDimmed = !lineNamesStr.includes(layerName);
+                const isOnMap = map.hasLayer(layer);
                 
-                if (isDimmed) {
-                    // Remove dimmed bus stop layers from the map
-                    if (map.hasLayer(layer)) {
-                        map.removeLayer(layer);
-                    }
-                } else {
-                    // Always show highlighted route's stops regardless of zoom
-                    if (!map.hasLayer(layer)) {
-                        layer.addTo(map);
-                    }
+                if (isDimmed && isOnMap) {
+                    busStopsToRemove.push(layer);
+                } else if (!isDimmed && !isOnMap) {
+                    busStopsToAdd.push(layer);
                 }
             });
+            busStopsToRemove.forEach(layer => map.removeLayer(layer));
+            busStopsToAdd.forEach(layer => map.addLayer(layer));
             
-            // Remove/show live train markers (subway and commuter rail)
+            // Remove/show live train markers (subway and commuter rail) - batch operations
+            const trainMarkersToRemove = [];
+            const trainMarkersToAdd = [];
             trainMarkers.forEach((marker, trainId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = !lineNames.includes(marker.routeName);
+                    const isDimmed = !lineNamesStr.includes(String(marker.routeName));
+                    const isOnMap = map.hasLayer(marker);
                     
-                    if (isDimmed) {
-                        // Remove dimmed marker from map
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        // Ensure highlighted marker is on map
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
+                    if (isDimmed && isOnMap) {
+                        trainMarkersToRemove.push(marker);
+                    } else if (!isDimmed && !isOnMap) {
+                        trainMarkersToAdd.push(marker);
                     }
                 }
             });
+            trainMarkersToRemove.forEach(marker => map.removeLayer(marker));
+            trainMarkersToAdd.forEach(marker => map.addLayer(marker));
             
-            // Remove/show live bus markers
+            // Remove/show live bus markers - batch operations
+            const busMarkersToRemove = [];
+            const busMarkersToAdd = [];
             busMarkers.forEach((marker, busId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = !lineNames.includes(marker.routeName);
+                    const isDimmed = !lineNamesStr.includes(String(marker.routeName));
+                    const isOnMap = map.hasLayer(marker);
                     
-                    if (isDimmed) {
-                        // Remove dimmed marker from map
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        // Ensure highlighted marker is on map
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
+                    if (isDimmed && isOnMap) {
+                        busMarkersToRemove.push(marker);
+                    } else if (!isDimmed && !isOnMap) {
+                        busMarkersToAdd.push(marker);
                     }
                 }
             });
+            busMarkersToRemove.forEach(marker => map.removeLayer(marker));
+            busMarkersToAdd.forEach(marker => map.addLayer(marker));
             
-            // Remove/show live shuttle markers
+            // Remove/show live shuttle markers - batch operations
+            const shuttleMarkersToRemove = [];
+            const shuttleMarkersToAdd = [];
             shuttleMarkers.forEach((marker, shuttleId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = !lineNames.includes(marker.routeName);
+                    const isDimmed = !lineNamesStr.includes(String(marker.routeName));
+                    const isOnMap = map.hasLayer(marker);
                     
-                    if (isDimmed) {
-                        // Remove dimmed marker from map
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        // Ensure highlighted marker is on map
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
+                    if (isDimmed && isOnMap) {
+                        shuttleMarkersToRemove.push(marker);
+                    } else if (!isDimmed && !isOnMap) {
+                        shuttleMarkersToAdd.push(marker);
                     }
                 }
             });
+            shuttleMarkersToRemove.forEach(marker => map.removeLayer(marker));
+            shuttleMarkersToAdd.forEach(marker => map.addLayer(marker));
             
-            // Remove/show live Silver Line markers
+            // Remove/show live Silver Line markers - batch operations
+            const silverLineMarkersToRemove = [];
+            const silverLineMarkersToAdd = [];
             silverLineMarkers.forEach((marker, silverId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = !lineNames.includes(marker.routeName);
+                    const isDimmed = !lineNamesStr.includes(String(marker.routeName));
+                    const isOnMap = map.hasLayer(marker);
                     
-                    if (isDimmed) {
-                        // Remove dimmed marker from map
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        // Ensure highlighted marker is on map
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
+                    if (isDimmed && isOnMap) {
+                        silverLineMarkersToRemove.push(marker);
+                    } else if (!isDimmed && !isOnMap) {
+                        silverLineMarkersToAdd.push(marker);
                     }
                 }
             });
+            silverLineMarkersToRemove.forEach(marker => map.removeLayer(marker));
+            silverLineMarkersToAdd.forEach(marker => map.addLayer(marker));
             
-            // Remove live ferry markers (always removed when any line is highlighted)
+            // Remove live ferry markers (always removed when any line is highlighted) - batch operations
+            const ferryMarkersToRemove = [];
             ferryMarkers.forEach((marker, ferryId) => {
                 if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
+                    ferryMarkersToRemove.push(marker);
                 }
             });
+            ferryMarkersToRemove.forEach(marker => map.removeLayer(marker));
             
-            // Hide all LIRR lines when highlighting MBTA lines
+            // Hide all LIRR lines when highlighting MBTA lines - batch operations
+            const lirrLayersToRemove = [];
             lirrLines.forEach(layerName => {
                 if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                    map.removeLayer(layers[layerName]);
+                    lirrLayersToRemove.push(layers[layerName]);
                 }
             });
+            lirrLayersToRemove.forEach(layer => map.removeLayer(layer));
             
-            // Remove all LIRR live train markers
+            // Remove all LIRR live train markers - batch operations
+            const lirrMarkersToRemove = [];
             lirrMarkers.forEach((marker, trainId) => {
                 if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
+                    lirrMarkersToRemove.push(marker);
                 }
             });
+            lirrMarkersToRemove.forEach(marker => map.removeLayer(marker));
         }
         
         // Function to highlight a specific line and dim all others
         function highlightLine(lineName) {
-            highlightedLine = lineName;
+            // CRITICAL: Convert lineName to string to ensure consistent key matching
+            // JavaScript object keys are always strings, but lineName might be a number
+            const lineNameStr = String(lineName);
+            highlightedLine = lineNameStr;
             highlightedLIRRLine = null; // Clear LIRR highlighting
             highlightedMetroNorthLine = null; // Clear Metro North highlighting
             
             // Always show the highlighted line (even if checkbox is off)
-            if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                map.addLayer(layers[lineName]);
+            if (layers[lineNameStr] && !map.hasLayer(layers[lineNameStr])) {
+                map.addLayer(layers[lineNameStr]);
             }
             // Always show stops for highlighted line regardless of zoom
             // Create bus stops if they don't exist yet
             if (busStopLayers.size === 0) {
                 createBusStopMarkers();
             }
-            if (busStopLayers.has(lineName)) {
-                if (!map.hasLayer(busStopLayers.get(lineName))) {
-                    busStopLayers.get(lineName).addTo(map);
+            if (busStopLayers.has(lineNameStr)) {
+                if (!map.hasLayer(busStopLayers.get(lineNameStr))) {
+                    busStopLayers.get(lineNameStr).addTo(map);
                 }
             }
             
             // Remove dimmed layers from map or show highlighted one
             Object.keys(layers).forEach(layerName => {
-                const isDimmed = layerName !== lineName;
+                // CRITICAL: Check if this is an MBTA bus route first
+                // If it's in mbtaBusData, it's an MBTA bus route and should be dimmed (not skipped)
+                const isMBTABus = typeof mbtaBusData !== 'undefined' && mbtaBusData && mbtaBusData[layerName];
+                
+                // Only skip if it's NOT an MBTA bus route AND it's an MTA subway route
+                // This prevents MBTA bus routes (like "1" and "4") from being skipped just because
+                // they share the same ID with MTA subway routes
+                if (!isMBTABus) {
+                    const isMTASubway = typeof mtaSubwayRoutesData !== 'undefined' && mtaSubwayRoutesData && mtaSubwayRoutesData.routes && mtaSubwayRoutesData.routes[layerName];
+                    if (isMTASubway || lirrLines.includes(layerName) || metroNorthLines.includes(layerName)) {
+                        return;
+                    }
+                }
+                
+                // MBTA subway/commuter rail lines (in mbtaStopsData) should be dimmed like any other MBTA line
+                // Only skip non-MBTA systems (MTA, LIRR, Metro North)
+                
+                const isDimmed = layerName !== lineNameStr;
                 
                 if (isDimmed) {
                     // Remove dimmed layer from map
@@ -2597,7 +2872,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Also handle bus stop layers separately - remove dimmed ones, show highlighted one
             busStopLayers.forEach((layer, layerName) => {
-                const isDimmed = layerName !== lineName;
+                const isDimmed = layerName !== lineNameStr;
                 
                 if (isDimmed) {
                     // Remove dimmed bus stop layers from the map
@@ -2615,7 +2890,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Remove/show live train markers (subway and commuter rail)
             trainMarkers.forEach((marker, trainId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = marker.routeName !== lineName;
+                    const isDimmed = String(marker.routeName) !== lineNameStr;
                     
                     if (isDimmed) {
                         // Remove dimmed marker from map
@@ -2634,7 +2909,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Remove/show live bus markers
             busMarkers.forEach((marker, busId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = marker.routeName !== lineName;
+                    const isDimmed = String(marker.routeName) !== lineNameStr;
                     
                     if (isDimmed) {
                         // Remove dimmed marker from map
@@ -2672,7 +2947,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Remove/show live Silver Line markers
             silverLineMarkers.forEach((marker, silverId) => {
                 if (marker && marker.routeName) {
-                    const isDimmed = marker.routeName !== lineName;
+                    const isDimmed = String(marker.routeName) !== lineNameStr;
                     
                     if (isDimmed) {
                         // Remove dimmed marker from map
@@ -4435,55 +4710,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                     
-                    // Create train marker with custom line-specific icons
-                    const baseIconSize = 20;
-                    const currentZoom = map.getZoom();
-                    const iconSize = getIconSize(baseIconSize, currentZoom);
-                    
-                    let trainIcon;
-                    
+                    // Determine icon URL based on route
+                    let iconUrl = 'icons/commuterrailcirc.png'; // Default
                     if (routeName.includes('Red Line') || routeName.includes('Mattapan')) {
-                        trainIcon = L.icon({
-                            iconUrl: 'icons/readlinecirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
+                        iconUrl = 'icons/readlinecirc.png';
                     } else if (routeName.includes('Blue Line')) {
-                        trainIcon = L.icon({
-                            iconUrl: 'icons/bluelinecirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
+                        iconUrl = 'icons/bluelinecirc.png';
                     } else if (routeName.includes('Green Line') || routeName.includes('Green-')) {
-                        trainIcon = L.icon({
-                            iconUrl: 'icons/greenlinecirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
+                        iconUrl = 'icons/greenlinecirc.png';
                     } else if (routeName.includes('Orange Line')) {
-                        trainIcon = L.icon({
-                            iconUrl: 'icons/orangelinecirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
-                    } else {
-                        // Use commuter rail icon for all other routes (CapeFlyer, Fairmount, etc.)
-                        trainIcon = L.icon({
-                            iconUrl: 'icons/commuterrailcirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
+                        iconUrl = 'icons/orangelinecirc.png';
                     }
                     
-                    const trainMarker = L.marker([lat, lng], {
-                        icon: trainIcon,
-                        zIndexOffset: 200
-                    });
+                    const baseIconSize = 28; // Increased from 20 for better visibility
+                    const currentZoom = map.getZoom();
+                    const iconSize = getIconSize(baseIconSize, currentZoom);
                     
                     // Get direction information (inbound/outbound)
                     const direction = train.attributes.direction_id === 0 ? 'Inbound' : 'Outbound';
@@ -4492,7 +4733,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     let popupContent = `
                         <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;">
                             <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
-                                <img src="${trainIcon.options.iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                                <img src="${iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
                                 Live Train
                             </div>
                             <b>Route:</b> ${routeName === 'Unknown Route' ? (routeId.startsWith('CR-') ? routeId.substring(3) + ' Line' : routeId) : routeName}<br>`;
@@ -4558,19 +4799,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Use tooltip for all trains, direction based on latitude
                     const tooltipDirection = lat < 42.361220 ? 'bottom' : 'top';
-                    trainMarker.bindTooltip(popupContent, { 
-                        direction: tooltipDirection,
-                        permanent: false,
-                        interactive: true,
-                        className: 'custom-tooltip'
-                    });
                     
-                    // Store route name and ID with marker for filtering
-                    trainMarker.routeName = routeName;
-                    trainMarker.routeId = routeId;
-                    
-                    // Add click handler to highlight the line (for both subway and commuter rail)
-                    trainMarker.on('click', function() {
+                    // Create click handler to highlight the line (for both subway and commuter rail)
+                    const onClickHandler = function() {
                         if (subwayLines.includes(routeName) || commuterLines.includes(routeName) || routeId.startsWith('CR-')) {
                             // If this line is already highlighted, reset; otherwise highlight it
                             if (isLineHighlighted(routeName)) {
@@ -4591,6 +4822,20 @@ document.addEventListener('DOMContentLoaded', function() {
                                 highlightLine(routeName);
                             }
                         }
+                    };
+                    
+                    // Create marker using generalized function
+                    const trainMarker = renderLiveVehicleMarker([lat, lng], {
+                        iconUrl: iconUrl,
+                        iconSize: [iconSize, iconSize],
+                        baseIconSize: baseIconSize,
+                        iconAnchor: [iconSize / 2, iconSize / 2],
+                        tooltipContent: popupContent,
+                        tooltipDirection: tooltipDirection,
+                        routeName: routeName,
+                        routeId: routeId,
+                        onClick: onClickHandler,
+                        zIndexOffset: 200
                     });
                     
                     // Add to map and store reference (only if the category is checked)
@@ -4698,18 +4943,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     const routeId = bus.relationships?.route?.data?.id;
                     const label = bus.attributes.label; // Bus number/label
                     
+                    // CRITICAL: Convert routeId to string to ensure consistent key matching
+                    // JavaScript object keys are always strings, but API might return numbers for single-digit routes
+                    const routeIdStr = routeId ? String(routeId) : null;
+                    
                     // Check if this is a shuttle
-                    const isShuttle = routeId && (
-                        routeId.startsWith('Shuttle-') ||
-                        (typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[routeId])
+                    const isShuttle = routeIdStr && (
+                        routeIdStr.startsWith('Shuttle-') ||
+                        (typeof mbtaShuttleData !== 'undefined' && mbtaShuttleData[routeIdStr])
                     );
                     
                     // Map numeric route IDs to Silver Line names
                     const silverLineMap = {'741': 'SL1', '742': 'SL2', '743': 'SL3', '751': 'SL4', '749': 'SL5', '746': 'SLW'};
-                    const mappedRouteId = silverLineMap[routeId] || routeId;
+                    const mappedRouteId = silverLineMap[routeIdStr] || routeIdStr;
                     
                     // Check if this is a Silver Line route (check if it exists in our Silver Line data)
-                    const isSilverLine = routeId && (
+                    const isSilverLine = routeIdStr && (
                         (typeof silverLineData !== 'undefined' && silverLineData[mappedRouteId]) ||
                         silverLineRoutes.includes(mappedRouteId)
                     );
@@ -4720,17 +4969,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     let vehicleType = isShuttle ? 'Shuttle' : (isSilverLine ? 'Silver Line' : 'Bus');
                     
                     // Declare layerKey outside the if block so it's accessible throughout
-                    let layerKey = routeId || 'unknown';
+                    // Use string version to match Object.keys() results
+                    let layerKey = routeIdStr || 'unknown';
                     
-                    if (routeId) {
+                    if (routeIdStr) {
                         // Always show the route ID from the API
                         if (isSilverLine) {
                             layerKey = mappedRouteId; // Use mapped name for layer key
                             routeName = `Silver Line ${layerKey}`;
                             color = lineColors[layerKey] || color;
                         } else {
-                            routeName = isShuttle ? `Shuttle ${routeId}` : `Bus Route ${routeId}`;
-                            color = lineColors[routeId] || color;
+                            routeName = isShuttle ? `Shuttle ${routeIdStr}` : `Bus Route ${routeIdStr}`;
+                            color = lineColors[routeIdStr] || color;
                         }
                         
                         // Ensure this route has a layer (create one if it doesn't exist)
@@ -4746,24 +4996,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         iconUrl = 'icons/silverlinecirc.png';
                     }
                     
-                    const baseIconSize = 16;
+                    const baseIconSize = 22; // Increased from 16 for better visibility
                     const currentZoom = map.getZoom();
                     const iconSize = getIconSize(baseIconSize, currentZoom);
                     
-                    const vehicleIcon = L.icon({
-                        iconUrl: iconUrl,
-                        iconSize: [iconSize, iconSize],
-                        iconAnchor: [iconSize / 2, iconSize / 2],
-                        baseIconSize: baseIconSize
-                    });
-                    
                     // Set z-index: Silver Line under trains (200), buses/shuttles above (250)
                     const zIndex = isSilverLine ? 150 : 250;
-                    
-                    const vehicleMarker = L.marker([lat, lng], {
-                        icon: vehicleIcon,
-                        zIndexOffset: zIndex
-                    });
                     
                     // Get direction information (inbound/outbound)
                     const direction = bus.attributes.direction_id === 0 ? 'Inbound' : 'Outbound';
@@ -4772,7 +5010,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     let popupContent = `
                         <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0;">
                             <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
-                                <img src="${vehicleIcon.options.iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                                <img src="${iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
                                 Live ${vehicleType}
                             </div>
                             <b>Route:</b> ${routeName}<br>
@@ -4812,20 +5050,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Use tooltip for all vehicles, direction based on latitude
                     const tooltipDirection = lat < 42.361220 ? 'bottom' : 'top';
-                    vehicleMarker.bindTooltip(popupContent, { 
-                        direction: tooltipDirection,
-                        permanent: false,
-                        interactive: true,
-                        className: 'custom-tooltip'
-                    });
                     
-                    // Store route name with marker for filtering (use layerKey for matching with layers)
-                    vehicleMarker.routeName = layerKey; // Use layerKey instead of routeId for layer matching
-                    vehicleMarker.displayName = routeName; // Keep formatted name for display
-                    vehicleMarker.routeId = routeId; // Keep original routeId for reference
-                    
-                    // Add click handler to highlight the route
-                    vehicleMarker.on('click', function() {
+                    // Create click handler to highlight the route
+                    const onClickHandler = function() {
                         // If this route is already highlighted, reset; otherwise highlight it
                         if (isLineHighlighted(layerKey)) {
                             resetHighlight();
@@ -4855,6 +5082,21 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Always highlight the route (layer will be created even if empty)
                             highlightLine(layerKey);
                         }
+                    };
+                    
+                    // Create marker using generalized function
+                    const vehicleMarker = renderLiveVehicleMarker([lat, lng], {
+                        iconUrl: iconUrl,
+                        iconSize: [iconSize, iconSize],
+                        baseIconSize: baseIconSize,
+                        iconAnchor: [iconSize / 2, iconSize / 2],
+                        tooltipContent: popupContent,
+                        tooltipDirection: tooltipDirection,
+                        routeName: layerKey,
+                        displayName: routeName,
+                        routeId: routeIdStr,
+                        onClick: onClickHandler,
+                        zIndexOffset: zIndex
                     });
                     
                     // Add to map and store reference based on vehicle type
@@ -4986,23 +5228,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentZoom = map.getZoom();
                     const iconSize = getIconSize(baseIconSize, currentZoom);
                     
-                    const ferryIcon = L.icon({
-                        iconUrl: 'icons/commuterrailcirc.png', // Use commuter rail icon for now
-                        iconSize: [iconSize, iconSize],
-                        iconAnchor: [iconSize / 2, iconSize / 2],
-                        baseIconSize: baseIconSize
-                    });
-                    
-                    const ferryMarker = L.marker([lat, lng], {
-                        icon: ferryIcon,
-                        zIndexOffset: 300
-                    });
+                    const iconUrl = 'icons/commuterrailcirc.png'; // Use commuter rail icon for now
                     
                     // Create popup with ferry info
                     let popupContent = `
                         <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0;">
                             <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
-                                <img src="${ferryIcon.options.iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                                <img src="${iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
                                 Live Ferry
                             </div>
                             <b>Route:</b> ${routeName}<br>`;
@@ -5041,11 +5273,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Use tooltip for all ferries, direction based on latitude
                     const tooltipDirection = lat < 42.361220 ? 'bottom' : 'top';
-                    ferryMarker.bindTooltip(popupContent, { 
-                        direction: tooltipDirection,
-                        permanent: false,
-                        interactive: true,
-                        className: 'custom-tooltip'
+                    
+                    // Create marker using generalized function
+                    const ferryMarker = renderLiveVehicleMarker([lat, lng], {
+                        iconUrl: iconUrl,
+                        iconSize: [iconSize, iconSize],
+                        baseIconSize: baseIconSize,
+                        iconAnchor: [iconSize / 2, iconSize / 2],
+                        tooltipContent: popupContent,
+                        tooltipDirection: tooltipDirection,
+                        routeName: routeName,
+                        zIndexOffset: 300
                     });
                     
                     // Add to map and store reference (only if ferry checkbox is checked and no line is highlighted)
@@ -5453,27 +5691,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         const baseIconSize = 20;
                         const currentZoom = map.getZoom();
                         const iconSize = getIconSize(baseIconSize, currentZoom);
+                        const iconUrl = 'icons/mtacirc.png';
                         
-                        const metroNorthIcon = L.icon({
-                            iconUrl: 'icons/mtacirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
-                        
-                        const trainMarker = L.marker([lat, lon], {
-                            icon: metroNorthIcon,
-                            zIndexOffset: 200
-                        });
-                        
-                        // Store train info for reference
-                        trainMarker.routeName = routeName;
-                        trainMarker.trainId = trainId;
-                        trainMarker.tripId = tripId;
-                        
-                        // Add click handler for highlighting (if we have a valid route)
+                        // Create click handler for highlighting (if we have a valid route)
+                        let onClickHandler = null;
                         if (routeId && routeName !== 'Metro North Train' && !routeName.startsWith('Trip ')) {
-                            trainMarker.on('click', function(e) {
+                            onClickHandler = function(e) {
                                 L.DomEvent.stopPropagation(e);
                                 
                                 // Toggle highlighting
@@ -5482,14 +5705,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 } else {
                                     highlightMetroNorthLine(routeName);
                                 }
-                            });
+                            };
                         }
                         
                         // Create tooltip with train info
                         let tooltipContent = `
                             <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;">
                                 <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
-                                    <img src="${metroNorthIcon.options.iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                                    <img src="${iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
                                     Live Metro North Train
                                 </div>`;
                         
@@ -5586,12 +5809,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Use tooltip for all trains, direction based on latitude
                         const tooltipDirection = lat < 40.76 ? 'bottom' : 'top';
-                        trainMarker.bindTooltip(tooltipContent, { 
-                            direction: tooltipDirection,
-                            permanent: false,
-                            interactive: true,
-                            className: 'custom-tooltip'
+                        
+                        // Create marker using generalized function
+                        const trainMarker = renderLiveVehicleMarker([lat, lon], {
+                            iconUrl: iconUrl,
+                            iconSize: [iconSize, iconSize],
+                            baseIconSize: baseIconSize,
+                            iconAnchor: [iconSize / 2, iconSize / 2],
+                            tooltipContent: tooltipContent,
+                            tooltipDirection: tooltipDirection,
+                            routeName: routeName,
+                            onClick: onClickHandler,
+                            zIndexOffset: 200
                         });
+                        
+                        // Store additional train info for reference
+                        if (trainMarker) {
+                            trainMarker.trainId = trainId;
+                            trainMarker.tripId = tripId;
+                        }
                         
                         // Add to map if Metro North live tracking is enabled
                         const metroNorthLiveCheckbox = document.getElementById('show-metro-north-live');
@@ -5852,27 +6088,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         const baseIconSize = 20;
                         const currentZoom = map.getZoom();
                         const iconSize = getIconSize(baseIconSize, currentZoom);
+                        const iconUrl = 'icons/mtacirc.png';
                         
-                        const lirrIcon = L.icon({
-                            iconUrl: 'icons/mtacirc.png',
-                            iconSize: [iconSize, iconSize],
-                            iconAnchor: [iconSize / 2, iconSize / 2],
-                            baseIconSize: baseIconSize
-                        });
-                        
-                        const trainMarker = L.marker([lat, lon], {
-                            icon: lirrIcon,
-                            zIndexOffset: 200
-                        });
-                        
-                        // Store train info for reference
-                        trainMarker.routeName = routeName;
-                        trainMarker.trainId = trainId;
-                        trainMarker.tripId = tripId;
-                        
-                        // Add click handler for highlighting (if we have a valid route)
+                        // Create click handler for highlighting (if we have a valid route)
+                        let onClickHandler = null;
                         if (routeId && routeName !== 'LIRR Train' && !routeName.startsWith('Trip ')) {
-                            trainMarker.on('click', function(e) {
+                            onClickHandler = function(e) {
                                 L.DomEvent.stopPropagation(e);
                                 
                                 // Toggle highlighting
@@ -5881,14 +6102,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 } else {
                                     highlightLIRRLine(routeName);
                                 }
-                            });
+                            };
                         }
                         
                         // Create tooltip with train info
                         let tooltipContent = `
                             <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;">
                                 <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
-                                    <img src="${lirrIcon.options.iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                                    <img src="${iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
                                     Live LIRR Train
                                 </div>`;
                         
@@ -5956,12 +6177,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Use tooltip for all trains, direction based on latitude
                         const tooltipDirection = lat < 40.76 ? 'bottom' : 'top';
-                        trainMarker.bindTooltip(tooltipContent, { 
-                            direction: tooltipDirection,
-                            permanent: false,
-                            interactive: true,
-                            className: 'custom-tooltip'
+                        
+                        // Create marker using generalized function
+                        const trainMarker = renderLiveVehicleMarker([lat, lon], {
+                            iconUrl: iconUrl,
+                            iconSize: [iconSize, iconSize],
+                            baseIconSize: baseIconSize,
+                            iconAnchor: [iconSize / 2, iconSize / 2],
+                            tooltipContent: tooltipContent,
+                            tooltipDirection: tooltipDirection,
+                            routeName: routeName,
+                            onClick: onClickHandler,
+                            zIndexOffset: 200
                         });
+                        
+                        // Store additional train info for reference
+                        if (trainMarker) {
+                            trainMarker.trainId = trainId;
+                            trainMarker.tripId = tripId;
+                        }
                         
                         // Add to map if LIRR live tracking is enabled
                         const lirrLiveCheckbox = document.getElementById('show-lirr-live');

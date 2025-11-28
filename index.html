@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Regional Transit Tracker - MBTA & MTA</title>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icons/commuterrailcirc.png">
+    
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -273,40 +276,40 @@
     
 
     <!-- Include the MBTA stops data -->
-    <script src="mbta-stops.js"></script>
+    <script src="data/mbta-stops.js"></script>
     
     <!-- Include the MBTA bus data -->
-    <script src="mbta-bus-data.js"></script>
+    <script src="data/mbta-bus-data.js"></script>
     
     <!-- Include the MBTA shuttle data -->
-    <script src="mbta-shuttle-data.js"></script>
+    <script src="data/mbta-shuttle-data.js"></script>
     
     <!-- Include the MBTA Silver Line data -->
-    <script src="mbta-silver-line-data.js"></script>
+    <script src="data/mbta-silver-line-data.js"></script>
     
     <!-- Include the MBTA ferry data -->
-    <script src="mbta-ferry-data.js"></script>
+    <script src="data/mbta-ferry-data.js"></script>
     
     <!-- Include LIRR data (if available) -->
     <script>
         // Placeholder for LIRR data - will be replaced when data file is generated
         let lirrRoutesData = null;
     </script>
-    <script src="lirr-routes-data.js" onerror="console.log('LIRR routes data not yet generated')"></script>
+    <script src="data/lirr-routes-data.js" onerror="console.log('LIRR routes data not yet generated')"></script>
     
     <!-- Include Metro North data (if available) -->
     <script>
         // Placeholder for Metro North data - will be replaced when data file is generated
         let metroNorthRoutesData = null;
     </script>
-    <script src="metro-north-routes-data.js" onerror="console.log('Metro North routes data not yet generated')"></script>
+    <script src="data/metro-north-routes-data.js" onerror="console.log('Metro North routes data not yet generated')"></script>
     
     <!-- Include MTA Subway data (if available) -->
     <script>
         // Placeholder for MTA Subway data - will be replaced when data file is generated
         let mtaSubwayRoutesData = null;
     </script>
-    <script src="mta-subway-routes-data.js" onerror="console.log('MTA Subway routes data not yet generated')"></script>
+    <script src="data/mta-subway-routes-data.js" onerror="console.log('MTA Subway routes data not yet generated')"></script>
 
     <!-- Tab switching functionality -->
     <script>
