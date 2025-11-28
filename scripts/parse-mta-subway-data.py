@@ -347,42 +347,23 @@ class MTASubwayDataParser:
         
         # Also create ordered stop list for the route (using most common trip pattern)
         # Find the trip with most stops (likely the full route)
+        longest_trip = None
         if trip_stop_times:
             longest_trip = max(trip_stop_times.items(), key=lambda x: len(x[1]))
             ordered_stops = [stop['stop_id'] for stop in longest_trip[1]]
         else:
             ordered_stops = []
         
-        # OPTIMIZATION: Only keep a minimal set of representative trips instead of all trips
-        # This dramatically reduces file size while still allowing trip matching
-        # Keep: 1) The longest trip (full route), 2) A few trips with different stop patterns
+        # OPTIMIZATION: Only keep the longest trip per route (most complete route pattern)
+        # This dramatically reduces file size - we only need ONE trip per route to get the stop order
+        # The JavaScript can use ordered_stops and avg_travel_times for most cases
+        # trip_stop_times is only used as a fallback for trip matching
         optimized_trip_stop_times = {}
         
-        if trip_stop_times:
-            # Always keep the longest trip (most complete)
+        if trip_stop_times and longest_trip:
+            # Only keep the longest trip (most complete route) - this is enough for trip matching
             longest_trip_id, longest_trip_stops = longest_trip
             optimized_trip_stop_times[longest_trip_id] = longest_trip_stops
-            
-            # Group trips by their stop sequence pattern (to find different directions/variants)
-            # Keep up to 3 additional trips with different patterns
-            trip_patterns = {}
-            for trip_id, stops in trip_stop_times.items():
-                if trip_id == longest_trip_id:
-                    continue
-                # Create a pattern key from the first and last few stops
-                if len(stops) >= 4:
-                    pattern_key = (
-                        stops[0]['stop_id'],
-                        stops[1]['stop_id'],
-                        stops[-2]['stop_id'],
-                        stops[-1]['stop_id']
-                    )
-                    if pattern_key not in trip_patterns:
-                        trip_patterns[pattern_key] = trip_id
-            
-            # Add up to 3 additional representative trips
-            for pattern_key, trip_id in list(trip_patterns.items())[:3]:
-                optimized_trip_stop_times[trip_id] = trip_stop_times[trip_id]
         
         result = {
             'trip_stop_times': optimized_trip_stop_times,  # Only representative trips (much smaller!)
