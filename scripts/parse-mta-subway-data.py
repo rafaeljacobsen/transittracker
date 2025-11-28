@@ -265,6 +265,118 @@ class MTASubwayDataParser:
         print(f"✅ Mapped {len(trip_to_headsign)} trips to destinations")
         return trip_to_route, trip_to_headsign
     
+    def parse_stop_times_for_route(self, route_short_name):
+        """Parse stop_times.txt to get ordered stops and travel times for a specific route"""
+        print(f"\n⏱️  Parsing stop times for route {route_short_name}...")
+        
+        # First, get route_id from routes
+        routes_data = self.read_csv_from_file('routes.txt')
+        route_id = None
+        for row in routes_data:
+            if row.get('route_short_name', '').strip() == route_short_name:
+                route_id = row.get('route_id', '')
+                break
+        
+        if not route_id:
+            print(f"⚠️  Route {route_short_name} not found")
+            return {}
+        
+        # Get trip_ids for this route
+        trips_data = self.read_csv_from_file('trips.txt')
+        trip_ids = set()
+        for row in trips_data:
+            if row.get('route_id', '') == route_id:
+                trip_ids.add(row.get('trip_id', ''))
+        
+        # Parse stop_times for these trips
+        stop_times_data = self.read_csv_from_file('stop_times.txt')
+        
+        # Map: trip_id -> list of {stop_sequence, stop_id, arrival_time, departure_time}
+        trip_stop_times = defaultdict(list)
+        
+        for row in stop_times_data:
+            trip_id = row.get('trip_id', '')
+            if trip_id in trip_ids:
+                try:
+                    stop_sequence = int(row.get('stop_sequence', 0))
+                    stop_id = row.get('stop_id', '')
+                    arrival_time = row.get('arrival_time', '')
+                    departure_time = row.get('departure_time', '')
+                    
+                    trip_stop_times[trip_id].append({
+                        'stop_sequence': stop_sequence,
+                        'stop_id': stop_id,
+                        'arrival_time': arrival_time,
+                        'departure_time': departure_time
+                    })
+                except (ValueError, TypeError):
+                    continue
+        
+        # Sort by stop_sequence for each trip
+        for trip_id in trip_stop_times:
+            trip_stop_times[trip_id].sort(key=lambda x: x['stop_sequence'])
+        
+        # Calculate average travel times between consecutive stops
+        # Map: (prev_stop_id, next_stop_id) -> average_time_seconds
+        stop_pair_times = defaultdict(list)
+        
+        for trip_id, stops in trip_stop_times.items():
+            for i in range(len(stops) - 1):
+                prev_stop = stops[i]
+                next_stop = stops[i + 1]
+                
+                # Calculate time difference
+                try:
+                    prev_time = self.parse_gtfs_time(prev_stop['departure_time'] or prev_stop['arrival_time'])
+                    next_time = self.parse_gtfs_time(next_stop['arrival_time'] or next_stop['departure_time'])
+                    
+                    if prev_time and next_time:
+                        time_diff = (next_time - prev_time) % (24 * 3600)  # Handle day rollover
+                        if time_diff > 0 and time_diff < 3600:  # Reasonable time (less than 1 hour)
+                            stop_pair_times[(prev_stop['stop_id'], next_stop['stop_id'])].append(time_diff)
+                except:
+                    continue
+        
+        # Average the times (use string keys for JavaScript compatibility)
+        avg_stop_times = {}
+        for (prev_id, next_id), times in stop_pair_times.items():
+            if times:
+                # Use comma-separated string as key for JavaScript compatibility
+                key = f"{prev_id},{next_id}"
+                avg_stop_times[key] = sum(times) / len(times)
+        
+        # Also create ordered stop list for the route (using most common trip pattern)
+        # Find the trip with most stops (likely the full route)
+        if trip_stop_times:
+            longest_trip = max(trip_stop_times.items(), key=lambda x: len(x[1]))
+            ordered_stops = [stop['stop_id'] for stop in longest_trip[1]]
+        else:
+            ordered_stops = []
+        
+        result = {
+            'trip_stop_times': dict(trip_stop_times),  # trip_id -> ordered stops
+            'avg_travel_times': avg_stop_times,  # (prev_stop_id, next_stop_id) -> seconds
+            'ordered_stops': ordered_stops  # Most common stop order
+        }
+        
+        print(f"✅ Parsed {len(trip_stop_times)} trips, {len(avg_stop_times)} stop pairs")
+        return result
+    
+    def parse_gtfs_time(self, time_str):
+        """Parse GTFS time string (HH:MM:SS) to seconds since midnight"""
+        if not time_str:
+            return None
+        try:
+            parts = time_str.split(':')
+            if len(parts) >= 3:
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                seconds = int(parts[2])
+                return hours * 3600 + minutes * 60 + seconds
+        except:
+            pass
+        return None
+    
     def generate_route_data(self):
         """Generate complete route data file"""
         routes = self.parse_routes()
@@ -273,6 +385,17 @@ class MTASubwayDataParser:
         route_stops_map, stop_names = self.map_stops_to_routes()
         stops_full = self.parse_stops()
         trip_to_route_map, trip_to_headsign_map = self.map_trips_to_routes()
+        
+        # Parse stop_times for all routes (for live tracking)
+        print("\n⏱️  Parsing stop times for all routes...")
+        route_stop_times = {}
+        for route in routes:
+            route_short_name = route.get('route_short_name', '').strip()
+            if route_short_name:
+                print(f"   Parsing stop times for route {route_short_name}...")
+                stop_times = self.parse_stop_times_for_route(route_short_name)
+                if stop_times and (stop_times.get('ordered_stops') or stop_times.get('trip_stop_times')):
+                    route_stop_times[route_short_name] = stop_times
         
         # Create stop_id -> full stop details mapping
         stop_details = {}
@@ -287,6 +410,7 @@ class MTASubwayDataParser:
             'totalRoutes': len(routes),
             'tripToRoute': trip_to_route_map,  # Add trip mapping for live tracking
             'tripToHeadsign': trip_to_headsign_map,  # Add headsign mapping for destinations
+            'routeStopTimes': route_stop_times,  # Add stop times for all routes live tracking
             'routes': {}
         }
         

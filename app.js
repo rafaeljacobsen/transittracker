@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const silverLineMarkers = new Map();
         const lirrMarkers = new Map(); // LIRR train markers
         const metroNorthMarkers = new Map(); // Metro North train markers
+        const mtaSubwayMarkers = new Map(); // MTA Subway train markers
         let trackingInterval;
         let ferryTrackingInterval;
         let busTrackingInterval;
@@ -18,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let silverLineTrackingInterval;
         let lirrTrackingInterval; // LIRR tracking interval
         let metroNorthTrackingInterval; // Metro North tracking interval
+        let mtaSubwayTrackingInterval; // MTA Subway tracking interval
         let lastUpdateTime = 0;
         let lastFerryUpdateTime = 0;
         let lastBusUpdateTime = 0;
@@ -25,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let lastSilverLineUpdateTime = 0;
         let lastLIRRUpdateTime = 0; // LIRR last update timestamp
         let lastMetroNorthUpdateTime = 0; // Metro North last update timestamp
+        let lastMtaSubwayUpdateTime = 0; // MTA Subway last update timestamp
         
         // State for line highlighting feature
         let highlightedLine = null;
@@ -1085,6 +1088,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 updateStats();
             });
+        }
+        
+        // MTA Subway live tracking filter
+        const subwayLiveCheckbox = document.getElementById('show-mta-subway-live');
+        if (subwayLiveCheckbox && mtaSubwayLines.length > 0) {
+            subwayLiveCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                
+                // Hide/show subway train markers
+                mtaSubwayMarkers.forEach((marker, trainId) => {
+                    if (marker) {
+                        if (isChecked) {
+                            marker.addTo(map);
+                        } else {
+                            marker.remove();
+                        }
+                    }
+                });
+                
+                // Control live tracking for subway
+                if (isChecked) {
+                    if (!mtaSubwayTrackingInterval) {
+                        startMtaSubwayTracking();
+                    }
+                } else {
+                    stopMtaSubwayTracking();
+                }
+                
+                updateStats();
+            });
+            
+            // Start subway tracking if checkbox is checked by default
+            if (subwayLiveCheckbox.checked) {
+                setTimeout(() => {
+                    startMtaSubwayTracking();
+                }, 2000); // Start after 2 seconds to let everything load
+            }
         }
         
         
@@ -2906,6 +2946,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
+            // Hide all MTA Subway live markers when highlighting MBTA lines
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
             // Remove/show live bus markers
             busMarkers.forEach((marker, busId) => {
                 if (marker && marker.routeName) {
@@ -3371,6 +3418,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
+            // Hide all MTA Subway live markers when highlighting LIRR
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
             // Hide all MBTA lines when highlighting LIRR lines
             Object.keys(layers).forEach(layerName => {
                 // Skip LIRR lines
@@ -3758,6 +3812,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
+            // Hide all MTA Subway live markers when highlighting Metro North
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            
             // Hide all MBTA lines when highlighting Metro North lines
             Object.keys(layers).forEach(layerName => {
                 // Skip Metro North lines
@@ -4057,6 +4118,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     map.removeLayer(marker);
                 }
             });
+            
+            // Hide MTA subway trains that don't match the highlighted lines
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    // Extract route ID from trainId (format: "routeId_tripId")
+                    const routeId = trainId.split('_')[0];
+                    if (!lineNames.includes(routeId)) {
+                        // Hide trains from other routes
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    } else {
+                        // Show trains from the highlighted routes
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    }
+                }
+            });
         }
         
         // Function to highlight a specific subway line and dim all others
@@ -4140,6 +4220,25 @@ document.addEventListener('DOMContentLoaded', function() {
             metroNorthMarkers.forEach((marker, trainId) => {
                 if (marker && map.hasLayer(marker)) {
                     map.removeLayer(marker);
+                }
+            });
+            
+            // Hide MTA subway trains that don't match the highlighted line
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    // Extract route ID from trainId (format: "routeId_tripId")
+                    const routeId = trainId.split('_')[0];
+                    if (routeId !== lineName) {
+                        // Hide trains from other routes
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    } else {
+                        // Show trains from the highlighted route
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    }
                 }
             });
             
@@ -4445,6 +4544,16 @@ document.addEventListener('DOMContentLoaded', function() {
             metroNorthMarkers.forEach((marker, trainId) => {
                 if (marker) {
                     if (showMetroNorthLive && !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                }
+            });
+            
+            // Restore MTA Subway live markers
+            const showMtaSubwayLive = document.getElementById('show-mta-subway-live').checked;
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker) {
+                    if (showMtaSubwayLive && !map.hasLayer(marker)) {
                         marker.addTo(map);
                     }
                 }
@@ -5904,7 +6013,736 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // MTA Subway Live Tracking Functions
         
-        // Function to start Subway live tracking
+        // Function to fetch live MTA Subway trains from GTFS-RT API
+        async function fetchMtaSubwayTrains() {
+            // MTA Subway GTFS-RT feed URLs (no API key needed!)
+            // Note: MTA has separate feeds for different line groups
+            // Note: Subway feeds use TripUpdate entities, not VehiclePosition (no lat/lon)
+            const MTA_SUBWAY_GTFS_RT_URLS = [
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs',      // 1, 2, 3, 4, 5, 6, 7, S
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace',  // A, C, E
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm', // B, D, F, M
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g',     // G
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz',   // J, Z
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw', // N, Q, R, W
+                'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l'     // L
+            ];
+            
+            try {
+                const now = Date.now();
+                
+                // Rate limiting - don't update more than once every 5 seconds
+                if (now - lastMtaSubwayUpdateTime < 5000) {
+                    return;
+                }
+                
+                lastMtaSubwayUpdateTime = now;
+                
+                // Load GTFS-RT proto definition (once, reused for all feeds)
+                // Cache the protobuf root to avoid reloading
+                if (!window.mtaSubwayProtobufRoot) {
+                    window.mtaSubwayProtobufRoot = await protobuf.load('./gtfs-realtime.proto');
+                }
+                const root = window.mtaSubwayProtobufRoot;
+                const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
+                
+                // Fetch from all MTA subway feeds in parallel for better performance
+                const feedPromises = MTA_SUBWAY_GTFS_RT_URLS.map(async (url) => {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) return [];
+                        const buffer = await response.arrayBuffer();
+                        const feed = FeedMessage.decode(new Uint8Array(buffer));
+                        return feed.entity.filter(e => e.tripUpdate).map(e => e.tripUpdate);
+                    } catch (error) {
+                        return []; // Return empty array on error, continue with other feeds
+                    }
+                });
+                
+                // Wait for all feeds to complete
+                const feedResults = await Promise.all(feedPromises);
+                const allTripUpdates = feedResults.flat();
+                
+                const tripUpdates = allTripUpdates;
+                
+                // Group trips by route
+                // Note: MTA subway route_id might be in trip or we might need to match via tripToRoute
+                const tripsByRoute = new Map();
+                
+                if (tripUpdates.length === 0) {
+                    return;
+                }
+                
+                // Create reverse lookup map for faster trip matching (route pattern -> route)
+                // This avoids O(n) searches through tripToRoute for each trip
+                const routePatternToRoute = new Map();
+                if (mtaSubwayRoutesData?.tripToRoute) {
+                    for (const [staticTripId, staticRoute] of Object.entries(mtaSubwayRoutesData.tripToRoute)) {
+                        const parts = staticTripId.split('_');
+                        if (parts.length > 0) {
+                            const routePattern = parts[parts.length - 1];
+                            if (!routePatternToRoute.has(routePattern)) {
+                                routePatternToRoute.set(routePattern, staticRoute);
+                            }
+                        }
+                    }
+                }
+                
+                tripUpdates.forEach(tripUpdate => {
+                    const routeId = tripUpdate.trip?.routeId || tripUpdate.trip?.route_id;
+                    const tripId = tripUpdate.trip?.tripId || tripUpdate.trip?.trip_id;
+                    let matchedRoute = null;
+                    
+                    // PRIMARY METHOD: Use tripToRoute mapping (most reliable for letter routes)
+                    // Letter routes often don't have route_id in GTFS-RT, so we must use trip_id mapping
+                    if (tripId && mtaSubwayRoutesData?.tripToRoute) {
+                        // Try exact match first
+                        const mappedRoute = mtaSubwayRoutesData.tripToRoute[tripId];
+                        if (mappedRoute && mtaSubwayRoutesData.routes?.[mappedRoute]) {
+                            matchedRoute = mappedRoute;
+                        } else {
+                            // Fast lookup using route pattern map
+                            const normalizedTripId = tripId.trim();
+                            const rtParts = normalizedTripId.split('_');
+                            const rtRoutePattern = rtParts.length > 0 ? rtParts[rtParts.length - 1] : normalizedTripId;
+                            
+                            // Try route pattern lookup first (O(1) instead of O(n))
+                            if (routePatternToRoute.has(rtRoutePattern)) {
+                                const routeFromPattern = routePatternToRoute.get(rtRoutePattern);
+                                if (mtaSubwayRoutesData.routes?.[routeFromPattern]) {
+                                    matchedRoute = routeFromPattern;
+                                }
+                            }
+                            
+                            // Fallback: check if any static trip ID ends with GTFS-RT trip ID
+                            if (!matchedRoute) {
+                                for (const [staticTripId, staticRoute] of Object.entries(mtaSubwayRoutesData.tripToRoute)) {
+                                    if (staticTripId.endsWith(normalizedTripId) && mtaSubwayRoutesData.routes?.[staticRoute]) {
+                                        matchedRoute = staticRoute;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // FALLBACK: Try direct route_id match (works for numeric routes)
+                    if (!matchedRoute && routeId) {
+                        // Check if this route exists in our data
+                        if (mtaSubwayRoutesData && mtaSubwayRoutesData.routes && mtaSubwayRoutesData.routes[routeId]) {
+                            matchedRoute = routeId;
+                        }
+                    }
+                    
+                    if (matchedRoute) {
+                        if (!tripsByRoute.has(matchedRoute)) {
+                            tripsByRoute.set(matchedRoute, []);
+                        }
+                        tripsByRoute.get(matchedRoute).push(tripUpdate);
+                    }
+                });
+                
+                // Update markers for all routes
+                updateMtaSubwayMarkers(tripsByRoute);
+                
+            } catch (error) {
+                console.error('❌ Error fetching MTA Subway trains:', error);
+                console.error('Error details:', error.message);
+            }
+        }
+        
+        // Function to update MTA Subway train markers on the map
+        function updateMtaSubwayMarkers(tripsByRoute) {
+            // Store currently open popups
+            const currentSubwayPopups = new Map();
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker.isPopupOpen()) {
+                    currentSubwayPopups.set(trainId, true);
+                }
+            });
+            
+            // Clear old markers
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker && marker.remove) {
+                    marker.remove();
+                }
+            });
+            mtaSubwayMarkers.clear();
+            
+            // Check if subway data is available
+            if (typeof mtaSubwayRoutesData === 'undefined' || !mtaSubwayRoutesData || !mtaSubwayRoutesData.routes) {
+                return;
+            }
+            
+            // Process each route
+            tripsByRoute.forEach((tripUpdates, routeId) => {
+                const routeData = mtaSubwayRoutesData.routes[routeId];
+                if (!routeData) {
+                    return; // Skip routes we don't have data for
+                }
+                
+                // Get stop_times data for this route
+                const routeStopTimes = mtaSubwayRoutesData.routeStopTimes?.[routeId] || {};
+                const tripStopTimes = routeStopTimes.trip_stop_times || {};
+                const avgTravelTimes = routeStopTimes.avg_travel_times || {};
+                const orderedStops = routeStopTimes.ordered_stops || [];
+                
+                
+                // CRITICAL: If orderedStops is empty, we cannot determine previous stops
+                if (orderedStops.length === 0) {
+                    // Skip this route if we don't have stop_times data
+                    return;
+                }
+                
+                // Track why trains are being filtered out for this route
+                let skippedNoTripId = 0;
+                let skippedNoStopUpdates = 0;
+                let skippedNoFutureStops = 0;
+                let skippedNoPreviousStop = 0;
+                let skippedStopNotFound = 0;
+                let skippedNoNextStopIdTime = 0;
+                let successCount = 0;
+                
+                // Process each trip update for this route
+                tripUpdates.forEach((tripUpdate, index) => {
+                try {
+                    const tripId = tripUpdate.trip?.tripId || tripUpdate.trip?.trip_id;
+                    if (!tripId) {
+                        skippedNoTripId++;
+                        if (skippedNoTripId <= 3) { // Only log first few
+                        }
+                        return;
+                    }
+                
+                // Get stop_time_updates (future stops with ETAs)
+                const stopTimeUpdates = tripUpdate.stopTimeUpdate || tripUpdate.stop_time_update || [];
+                if (stopTimeUpdates.length === 0) {
+                    skippedNoStopUpdates++;
+                    if (skippedNoStopUpdates <= 3) {
+                    }
+                    return;
+                }
+                
+                
+                // The API never stores past stops - find the first stop with valid arrival/departure time
+                // Sometimes the first stop might not have arrival.time, so we need to find the first valid one
+                const now = Math.floor(Date.now() / 1000); // Current time in seconds
+                let nextStopUpdate = null;
+                
+                for (let i = 0; i < stopTimeUpdates.length; i++) {
+                    const update = stopTimeUpdates[i];
+                    const stopId = update.stopId || update.stop_id;
+                    const arrivalTime = update.arrival?.time;
+                    const departureTime = update.departure?.time;
+                    
+                    // Need at least a stopId and either arrival or departure time
+                    if (stopId && (arrivalTime || departureTime)) {
+                        nextStopUpdate = update;
+                        break;
+                    }
+                }
+                
+                if (!nextStopUpdate) {
+                    skippedNoNextStopIdTime++;
+                    return;
+                }
+                
+                const nextStopId = nextStopUpdate.stopId || nextStopUpdate.stop_id;
+                const nextStopSequence = nextStopUpdate.stopSequence || nextStopUpdate.stop_sequence;
+                // Prefer arrival time, but use departure time as fallback
+                const nextArrivalTime = nextStopUpdate.arrival?.time || nextStopUpdate.departure?.time;
+                
+                if (!nextStopId || !nextArrivalTime) {
+                    skippedNoNextStopIdTime++;
+                    return;
+                }
+                
+                // Calculate ETA in seconds
+                const etaSeconds = nextArrivalTime - now;
+                
+                
+                // Find previous stop using static schedule data
+                // The API doesn't include past stops, so we must use the static schedule
+                let previousStopId = null;
+                let avgTravelTimeSeconds = 120; // Default 2 minutes
+                
+                // METHOD 1: Try to get stop sequence from trip_stop_times (if available)
+                // Note: GTFS-RT trip_id format might differ from static GTFS trip_id
+                // Static format: "AFA25GEN-1038-Sunday-00_067550_1..S03R"
+                // GTFS-RT format: "067550_1..S03R" or similar
+                let tripStops = tripStopTimes[tripId];
+                let matchedTripId = tripId;
+                
+                // If no exact match, try to find a trip that contains this trip_id
+                if (!tripStops) {
+                    // Extract the key part (usually the last segment after underscore)
+                    const tripIdKey = tripId.split('_').pop() || tripId;
+                    
+                    for (const [staticTripId, stops] of Object.entries(tripStopTimes)) {
+                        // Check if static trip_id ends with the GTFS-RT trip_id
+                        if (staticTripId.endsWith(tripId) || staticTripId.includes(tripId)) {
+                            tripStops = stops;
+                            matchedTripId = staticTripId;
+                            break;
+                        }
+                        // Or check if the last segment matches
+                        const staticTripIdKey = staticTripId.split('_').pop();
+                        if (staticTripIdKey === tripIdKey || staticTripIdKey === tripId) {
+                            tripStops = stops;
+                            matchedTripId = staticTripId;
+                            break;
+                        }
+                    }
+                }
+                
+                // If tripStops doesn't contain the next stop (or wasn't found), try to find a trip that does
+                // This handles cases where trip matching found the wrong direction or no trip matched
+                if (!tripStops || tripStops.length === 0 || !tripStops.some(s => s.stop_id === nextStopId)) {
+                    // Try to find a trip that contains this stop (try exact match and variations)
+                    const stopVariations = [
+                        nextStopId,
+                        nextStopId.replace(/[NS]$/, '') + 'N',
+                        nextStopId.replace(/[NS]$/, '') + 'S',
+                        nextStopId.replace(/N$/, 'S'),
+                        nextStopId.replace(/S$/, 'N')
+                    ];
+                    
+                    for (const variation of stopVariations) {
+                        for (const [staticTripId, stops] of Object.entries(tripStopTimes)) {
+                            const hasStop = stops.some(s => s.stop_id === variation);
+                            if (hasStop) {
+                                tripStops = stops;
+                                matchedTripId = staticTripId;
+                                break;
+                            }
+                        }
+                        if (tripStops) break; // Found a trip, stop searching
+                    }
+                }
+                
+                // METHOD 1: Try to find previous stop using trip-specific stops
+                if (tripStops) {
+                    let currentIndex = -1;
+                    
+                    if (nextStopSequence !== undefined) {
+                        // Try to find by stop_sequence first, then by stop_id
+                        currentIndex = tripStops.findIndex(s => 
+                            (s.stop_sequence === nextStopSequence) || (s.stop_id === nextStopId)
+                        );
+                    } else {
+                        // No stop_sequence, find by stop_id only
+                        currentIndex = tripStops.findIndex(s => s.stop_id === nextStopId);
+                    }
+                    
+                    // If not found, try stop ID variations (N vs S)
+                    if (currentIndex === -1) {
+                        const stopVariations = [
+                            nextStopId.replace(/[NS]$/, '') + 'N',
+                            nextStopId.replace(/[NS]$/, '') + 'S',
+                            nextStopId.replace(/N$/, 'S'),
+                            nextStopId.replace(/S$/, 'N')
+                        ];
+                        for (const variation of stopVariations) {
+                            currentIndex = tripStops.findIndex(s => s.stop_id === variation);
+                            if (currentIndex !== -1) {
+                                // Found a match with variation - use it
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (currentIndex > 0) {
+                        previousStopId = tripStops[currentIndex - 1].stop_id;
+                        // Get average travel time between these stops
+                        const timeKeyStr = `${previousStopId},${nextStopId}`;
+                        if (avgTravelTimes[timeKeyStr] !== undefined) {
+                            avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
+                        }
+                    } else if (currentIndex === 0) {
+                        // Train is at the first stop in the trip
+                        previousStopId = nextStopId;
+                    }
+                    // If currentIndex === -1, next stop not found in this trip's stops, fall through to orderedStops
+                }
+                
+                // METHOD 2: Fallback to ordered stops list (if not found in trip-specific stops, or if no trip match)
+                if (!previousStopId && orderedStops.length > 0) {
+                    const nextIndex = orderedStops.indexOf(nextStopId);
+                    if (nextIndex > 0) {
+                        previousStopId = orderedStops[nextIndex - 1];
+                        const timeKeyStr = `${previousStopId},${nextStopId}`;
+                        if (avgTravelTimes[timeKeyStr] !== undefined) {
+                            avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
+                        }
+                    } else if (nextIndex === 0) {
+                        // Train is at the first stop
+                        previousStopId = nextStopId;
+                    } else {
+                        // nextIndex === -1, stop not found in ordered list
+                        // This should never happen if the data is correct
+                        // Check if the stop exists in routeData.stops with a different format
+                        if (routeData && routeData.stops) {
+                            const stopVariations = [
+                                nextStopId,
+                                nextStopId.replace(/[NS]$/, ''), // Remove direction suffix
+                                nextStopId + 'N', // Try with N suffix
+                                nextStopId + 'S'  // Try with S suffix
+                            ];
+                            
+                            for (const variation of stopVariations) {
+                                const foundStop = routeData.stops.find(s => s.stop_id === variation);
+                                if (foundStop) {
+                                    const foundIndex = orderedStops.indexOf(variation);
+                                    if (foundIndex > 0) {
+                                        previousStopId = orderedStops[foundIndex - 1];
+                                        const timeKeyStr = `${previousStopId},${variation}`;
+                                        if (avgTravelTimes[timeKeyStr] !== undefined) {
+                                            avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (!previousStopId) {
+                            // Still not found - this indicates a data mismatch
+                            console.error(`❌ Trip ${tripId}: Next stop ${nextStopId} not found in orderedStops list!`);
+                            console.error(`   This means the stop ID from GTFS-RT doesn't match the static data.`);
+                            console.error(`   Ordered stops sample:`, orderedStops.slice(0, 10));
+                            console.error(`   Check if stop ID format differs (e.g., "101" vs "101S")`);
+                        }
+                    }
+                }
+                
+                if (!previousStopId) {
+                    // Can't determine previous stop from static data - this is an error
+                    skippedNoPreviousStop++;
+                    
+                    // Build detailed error message
+                    const errorDetails = {
+                        tripId: tripId,
+                        nextStopId: nextStopId,
+                        nextStopSequence: nextStopSequence,
+                        tripStopsFound: tripStops ? tripStops.length : 0,
+                        orderedStopsCount: orderedStops.length,
+                        totalTripStopTimesEntries: Object.keys(tripStopTimes).length,
+                        sampleTripIds: Object.keys(tripStopTimes).slice(0, 5),
+                        orderedStopsSample: orderedStops.slice(0, 5),
+                        matchedTripId: matchedTripId !== tripId ? matchedTripId : null
+                    };
+                    
+                    if (tripStops) {
+                        errorDetails.tripStopsSample = tripStops.slice(0, 5).map(s => ({
+                            stop_id: s.stop_id,
+                            stop_sequence: s.stop_sequence
+                        }));
+                        errorDetails.nextStopInTripStops = tripStops.findIndex(s => s.stop_id === nextStopId);
+                    }
+                    
+                    console.error(`❌ ERROR: Trip ${tripId}: Could not determine previous stop for next stop ${nextStopId}`);
+                    console.error(`   Error details:`, errorDetails);
+                    
+                    // Throw error to help debug
+                    throw new Error(`Cannot determine previous stop for trip ${tripId}, next stop ${nextStopId}. See console for details.`);
+                }
+                
+                
+                // Find stop coordinates - use the same stop objects as in the map markers
+                // This ensures naming consistency between map markers and train tooltips
+                const nextStop = routeData.stops.find(s => s.stop_id === nextStopId);
+                const prevStop = routeData.stops.find(s => s.stop_id === previousStopId);
+                
+                if (!nextStop) {
+                    skippedStopNotFound++;
+                    if (skippedStopNotFound <= 3) {
+                        console.warn(`⚠️ Trip ${tripId}: Next stop ${nextStopId} not found in routeData.stops`);
+                        console.warn(`   Available stops in route:`, routeData.stops.slice(0, 5).map(s => s.stop_id));
+                    }
+                    return;
+                }
+                
+                if (!prevStop) {
+                    skippedStopNotFound++;
+                    if (skippedStopNotFound <= 3) {
+                    }
+                    return;
+                }
+                
+                // Handle case where previous and next stops are the same (train at station)
+                if (previousStopId === nextStopId) {
+                    // Train is at the next stop - show it there
+                    // We'll show the train at the stop location (progress = 1.0)
+                }
+                
+                // Ensure we're using the exact same name field as the map markers
+                // Both use stop.name from routeData.stops, so they should match
+                const nextStopName = nextStop.name || 'Unknown Stop';
+                const prevStopName = prevStop.name || 'Unknown Stop';
+                
+                // Calculate position along route line
+                // Algorithm:
+                // 1. ETA = time until train arrives at next stop
+                // 2. If ETA = 0, train is at next stop (progress = 1)
+                // 3. If ETA = avgTravelTime, train just left previous stop (progress = 0)
+                // 4. Progress = (avgTravelTime - ETA) / avgTravelTime
+                //    This gives us how far along the segment the train is (0 = at prev stop, 1 = at next stop)
+                // 
+                // BUT: If ETA > avgTravelTime, the train hasn't left the previous stop yet (or is delayed)
+                // In that case, we should show the train at or very close to the previous stop
+                let progress;
+                if (etaSeconds > avgTravelTimeSeconds) {
+                    // Train hasn't left previous stop yet (or is significantly delayed)
+                    // Show train very close to previous stop (progress near 0)
+                    // Use a small progress value based on how much time has passed
+                    const timeSincePrevStop = avgTravelTimeSeconds; // Assume train just left
+                    progress = Math.max(0, Math.min(0.1, timeSincePrevStop / avgTravelTimeSeconds));
+                } else {
+                    // Normal case: train is between stops
+                    progress = Math.max(0, Math.min(1, (avgTravelTimeSeconds - etaSeconds) / avgTravelTimeSeconds));
+                }
+                
+                
+                // Find the route shape that connects these stops
+                let trainPosition = null;
+                
+                // Get route shapes
+                const routeShapes = routeData.shapes || [];
+                if (routeShapes.length > 0) {
+                    // Find the shape segment between prev and next stops
+                    // For now, use the first shape and interpolate along it
+                    const shape = routeShapes[0];
+                    if (shape && shape.coords && shape.coords.length > 0) {
+                        // Find closest points to prev and next stops on the shape
+                        let prevIndex = 0;
+                        let nextIndex = shape.coords.length - 1;
+                        let minPrevDist = Infinity;
+                        let minNextDist = Infinity;
+                        
+                        shape.coords.forEach((coord, idx) => {
+                            const distToPrev = Math.sqrt(
+                                Math.pow(coord[0] - prevStop.lat, 2) + 
+                                Math.pow(coord[1] - prevStop.lon, 2)
+                            );
+                            const distToNext = Math.sqrt(
+                                Math.pow(coord[0] - nextStop.lat, 2) + 
+                                Math.pow(coord[1] - nextStop.lon, 2)
+                            );
+                            
+                            if (distToPrev < minPrevDist) {
+                                minPrevDist = distToPrev;
+                                prevIndex = idx;
+                            }
+                            if (distToNext < minNextDist) {
+                                minNextDist = distToNext;
+                                nextIndex = idx;
+                            }
+                        });
+                        
+                        // Ensure prevIndex < nextIndex
+                        if (prevIndex > nextIndex) {
+                            [prevIndex, nextIndex] = [nextIndex, prevIndex];
+                        }
+                        
+                        // Interpolate position along the segment
+                        const segmentLength = nextIndex - prevIndex;
+                        const targetIndex = prevIndex + Math.floor(segmentLength * progress);
+                        const clampedIndex = Math.max(prevIndex, Math.min(nextIndex, targetIndex));
+                        
+                        if (clampedIndex < shape.coords.length) {
+                            trainPosition = shape.coords[clampedIndex];
+                        }
+                    }
+                }
+                
+                // Fallback: simple linear interpolation between stops
+                if (!trainPosition) {
+                    // If previous and next stops are the same, use that stop's coordinates
+                    if (previousStopId === nextStopId) {
+                        trainPosition = [nextStop.lat, nextStop.lon];
+                    } else {
+                        trainPosition = [
+                            prevStop.lat + (nextStop.lat - prevStop.lat) * progress,
+                            prevStop.lon + (nextStop.lon - prevStop.lon) * progress
+                        ];
+                    }
+                }
+                
+                // Create train marker
+                const trainId = `${routeId}_${tripId}`;
+                const baseIconSize = 20;
+                const currentZoom = map.getZoom();
+                const iconSize = getIconSize(baseIconSize, currentZoom);
+                // Use correct icon for each route (lowercase for letter routes)
+                const iconName = routeId.toLowerCase();
+                const iconUrl = `icons/${iconName}.png`;
+                const color = routeData.color || '#EE352E';
+                
+                // Get headsign/destination from GTFS-RT feed
+                // Try multiple possible locations in the TripUpdate structure
+                let headsign = tripUpdate.trip?.tripProperties?.tripHeadsign ||
+                              tripUpdate.trip?.trip_properties?.trip_headsign ||
+                              tripUpdate.trip?.tripProperties?.trip_headsign ||
+                              tripUpdate.trip?.tripHeadsign ||
+                              tripUpdate.trip?.trip_headsign ||
+                              tripUpdate.trip?.headsign ||
+                              null;
+                
+                // If not in GTFS-RT trip descriptor, try to get from last stop in stop_time_updates
+                // The last stop is usually the final destination
+                if (!headsign && stopTimeUpdates.length > 0) {
+                    // Get the last stop_time_update (should be the final destination)
+                    const lastStopUpdate = stopTimeUpdates[stopTimeUpdates.length - 1];
+                    const lastStopId = lastStopUpdate.stopId || lastStopUpdate.stop_id;
+                    
+                    // Find the stop name from route data
+                    if (lastStopId && routeData.stops) {
+                        const lastStop = routeData.stops.find(s => s.stop_id === lastStopId);
+                        if (lastStop) {
+                            headsign = lastStop.name;
+                        }
+                    }
+                }
+                
+                // If still not found, try static data with trip_id matching
+                if (!headsign && mtaSubwayRoutesData && mtaSubwayRoutesData.tripToHeadsign) {
+                    // Try exact match first
+                    headsign = mtaSubwayRoutesData.tripToHeadsign[tripId];
+                    
+                    // If no exact match, try partial matching (GTFS-RT trip_id might be shorter)
+                    if (!headsign) {
+                        for (const [staticTripId, staticHeadsign] of Object.entries(mtaSubwayRoutesData.tripToHeadsign)) {
+                            if (staticTripId.endsWith(tripId) || tripId.endsWith(staticTripId.split('_').pop())) {
+                                headsign = staticHeadsign;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Fallback: use "Unknown" if we can't determine destination
+                if (!headsign) {
+                    headsign = 'Unknown';
+                }
+                
+                // Create tooltip
+                let tooltipContent = `
+                    <div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;">
+                        <div style="color: ${color}; font-weight: bold; margin-bottom: 3px;">
+                            <img src="${iconUrl}" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px;">
+                            Live ${routeId} Train
+                        </div>
+                        <b>Destination:</b> ${headsign}<br>
+                        <b>Previous Stop:</b> ${prevStopName}<br>
+                        <b>Next Stop:</b> ${nextStopName}<br>
+                        <b>ETA:</b> ${Math.round(etaSeconds / 60)} min<br>
+                        <b>Trip:</b> ${tripId.substring(0, 20)}...
+                    </div>
+                `;
+                
+                const tooltipDirection = trainPosition[0] < 40.76 ? 'bottom' : 'top';
+                
+                // Create marker
+                const trainMarker = renderLiveVehicleMarker(trainPosition, {
+                    iconUrl: iconUrl,
+                    iconSize: [iconSize, iconSize],
+                    baseIconSize: baseIconSize,
+                    iconAnchor: [iconSize / 2, iconSize / 2],
+                    tooltipContent: tooltipContent,
+                    tooltipDirection: tooltipDirection,
+                    routeName: routeId,
+                    onClick: function(e) {
+                        L.DomEvent.stopPropagation(e);
+                        if (highlightedSubwayLine === routeId) {
+                            resetSubwayHighlight();
+                        } else {
+                            highlightSubwayLine(routeId);
+                        }
+                    },
+                    zIndexOffset: 200
+                });
+                
+                if (trainMarker) {
+                    trainMarker.tripId = tripId;
+                    mtaSubwayMarkers.set(trainId, trainMarker);
+                    successCount++;
+                    
+                    // Check if we should show this marker
+                    const showSubwayLive = document.getElementById('show-mta-subway-live');
+                    let shouldShow = false;
+                    
+                    if (showSubwayLive && showSubwayLive.checked) {
+                        // Check if highlighting is active
+                        if (highlightedSubwayLine) {
+                            // Highlighting is active - only show trains from the highlighted route(s)
+                            if (highlightedSubwayLine === routeId || 
+                                (Array.isArray(highlightedSubwayLine) && highlightedSubwayLine.includes(routeId))) {
+                                shouldShow = true;
+                            }
+                            // else: shouldShow remains false (hide trains from other routes)
+                        } else {
+                            // No highlighting active - show all trains
+                            shouldShow = true;
+                        }
+                    }
+                    // else: shouldShow remains false (checkbox unchecked)
+                    
+                    // Apply visibility based on shouldShow
+                    if (shouldShow) {
+                        if (!map.hasLayer(trainMarker)) {
+                            trainMarker.addTo(map);
+                        }
+                    } else {
+                        if (map.hasLayer(trainMarker)) {
+                            map.removeLayer(trainMarker);
+                        }
+                    }
+                    
+                    // Restore popup if it was open
+                    if (currentSubwayPopups.has(trainId)) {
+                        trainMarker.openPopup();
+                    }
+                }
+                } catch (error) {
+                    // Log error but continue processing other trains
+                    skippedNoPreviousStop++;
+                    console.error(`❌ Error processing trip ${tripUpdate.trip?.tripId || tripUpdate.trip?.trip_id || 'unknown'}:`, error);
+                }
+                });
+            }); // End of tripsByRoute.forEach
+            
+            // Log summary of processing results
+        }
+        
+        // Function to start MTA Subway live tracking
+        function startMtaSubwayTracking() {
+            if (mtaSubwayTrackingInterval) {
+                return; // Already tracking
+            }
+            
+            // Initial fetch
+            fetchMtaSubwayTrains();
+            
+            // Set up interval (update every 10 seconds for subway)
+            mtaSubwayTrackingInterval = setInterval(fetchMtaSubwayTrains, 10000);
+        }
+        
+        // Function to stop MTA Subway live tracking
+        function stopMtaSubwayTracking() {
+            if (mtaSubwayTrackingInterval) {
+                clearInterval(mtaSubwayTrackingInterval);
+                mtaSubwayTrackingInterval = null;
+            }
+            
+            // Clear markers
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker && marker.remove) {
+                    marker.remove();
+                }
+            });
+            mtaSubwayMarkers.clear();
+        }
+        
         // Function to fetch live LIRR trains from MTA GTFS-RT API
         async function fetchLIRRTrains() {
             // Note: MTA feeds are now free and don't require API keys!
