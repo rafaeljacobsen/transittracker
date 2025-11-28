@@ -3411,19 +3411,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Hide all Metro North live markers when highlighting LIRR
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide all MTA Subway live markers when highlighting LIRR
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
+            // Re-evaluate visibility of all markers using centralized function
+            updateAllMarkerVisibility();
             
             // Hide all MBTA lines when highlighting LIRR lines
             Object.keys(layers).forEach(layerName => {
@@ -3490,17 +3479,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Add live LIRR markers back based on checkbox state
-            const showLIRRLive = document.getElementById('show-lirr-live').checked;
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker) {
-                    if (showLIRRLive && !map.hasLayer(marker)) {
-                        marker.addTo(map);
-                    } else if (!showLIRRLive && map.hasLayer(marker)) {
-                        map.removeLayer(marker);
-                    }
-                }
-            });
+            // Re-evaluate visibility of all markers using centralized function
+            updateAllMarkerVisibility();
             
             // Restore subway layers based on checkbox state (but respect highlighting)
             if (!highlightedSubwayLine) {
@@ -3541,6 +3521,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
+            
+            // Restore MTA Subway paths (must restore before markers)
+            const showMtaSubwayPaths = document.getElementById('show-mta-subway-paths').checked;
+            if (showMtaSubwayPaths) {
+                mtaSubwayLines.forEach(lineName => {
+                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
+                        map.addLayer(layers[lineName]);
+                    }
+                });
+            }
+            
+            // Re-evaluate visibility of all markers using centralized function
+            updateAllMarkerVisibility();
             
             // Restore MBTA layers based on checkbox states
             Object.keys(layers).forEach(layerName => {
@@ -3805,19 +3798,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Hide all LIRR live markers when highlighting Metro North
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide all MTA Subway live markers when highlighting Metro North
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
+            // Re-evaluate visibility of all markers using centralized function
+            updateAllMarkerVisibility();
             
             // Hide all MBTA lines when highlighting Metro North lines
             Object.keys(layers).forEach(layerName => {
@@ -3864,21 +3846,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Trigger immediate update to show all trains again
-            const showMetroNorthLive = document.getElementById('show-metro-north-live');
-            if (showMetroNorthLive && showMetroNorthLive.checked && typeof fetchMetroNorthTrains === 'function') {
-                // Immediately fetch and display all trains
-                fetchMetroNorthTrains();
-            } else {
-                // If live tracking is off, just re-add existing markers
-                metroNorthMarkers.forEach((marker, trainId) => {
-                    if (marker) {
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
-                    }
-                });
-            }
+            // Re-evaluate visibility of all markers using centralized function
+            updateAllMarkerVisibility();
             
             // Restore MBTA layers based on checkbox states
             Object.keys(layers).forEach(layerName => {
@@ -4549,15 +4518,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Restore MTA Subway live markers
-            const showMtaSubwayLive = document.getElementById('show-mta-subway-live').checked;
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker) {
-                    if (showMtaSubwayLive && !map.hasLayer(marker)) {
-                        marker.addTo(map);
+            // Restore MTA Subway paths (must restore before markers)
+            const showMtaSubwayPaths = document.getElementById('show-mta-subway-paths').checked;
+            if (showMtaSubwayPaths) {
+                mtaSubwayLines.forEach(lineName => {
+                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
+                        map.addLayer(layers[lineName]);
                     }
-                }
-            });
+                });
+            }
+            
+            // Re-evaluate visibility of all markers using centralized function
+            updateAllMarkerVisibility();
         }
 
         
@@ -4962,9 +4934,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Check if we should add to map (considering both checkbox and highlight state)
                     if (shouldShow) {
-                        // Don't show MBTA trains if LIRR line is highlighted
-                        if (highlightedLIRRLine) {
-                            // LIRR line is highlighted, hide all MBTA trains
+                        // Don't show MBTA trains if other systems are highlighted
+                        if (highlightedLIRRLine || highlightedSubwayLine || highlightedMetroNorthLine) {
+                            // Other systems are highlighted, hide all MBTA trains
                             // (don't add to map)
                         } else if (highlightedLine) {
                             // MBTA line is highlighted, only show markers for that line
@@ -5943,46 +5915,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         let shouldAddToMap = false;
                         
                         if (metroNorthLiveCheckbox && metroNorthLiveCheckbox.checked) {
-                            // Don't show Metro North trains if MBTA line is highlighted
-                            if (highlightedLine) {
-                                // MBTA line is highlighted, hide all Metro North trains
-                                // Don't add to map or store
-                                return;
-                            }
+                            // Always store the marker
+                            metroNorthMarkers.set(trainId, trainMarker);
                             
-                            // Don't show Metro North trains if LIRR line is highlighted
-                            if (highlightedLIRRLine) {
-                                // LIRR line is highlighted, hide all Metro North trains
-                                // Don't add to map or store
-                                return;
-                            }
+                            // Use centralized visibility function
+                            const shouldShow = shouldShowMarker('metroNorth', routeName, 'show-metro-north-live');
                             
-                            // Don't show Metro North trains if subway line is highlighted
-                            if (highlightedSubwayLine) {
-                                // Subway line is highlighted, hide all Metro North trains
-                                // Don't add to map or store
-                                return;
-                            }
-                            
-                            // Check if Metro North highlighting is active
-                            if (highlightedMetroNorthLine) {
-                                // Only show if this train is on the highlighted line
-                                const isHighlighted = Array.isArray(highlightedMetroNorthLine)
-                                    ? highlightedMetroNorthLine.includes(routeName)
-                                    : highlightedMetroNorthLine === routeName;
-                                
-                                if (isHighlighted) {
-                                    shouldAddToMap = true;
+                            // Apply visibility
+                            if (shouldShow) {
+                                if (!map.hasLayer(trainMarker)) {
+                                    trainMarker.addTo(map);
                                 }
                             } else {
-                                // No highlight active, show all trains
-                                shouldAddToMap = true;
-                            }
-                            
-                            // Only add to map and store if it should be shown
-                            if (shouldAddToMap) {
-                                trainMarker.addTo(map);
-                                metroNorthMarkers.set(trainId, trainMarker);
+                                if (map.hasLayer(trainMarker)) {
+                                    map.removeLayer(trainMarker);
+                                }
                             }
                         }
                         
@@ -6149,6 +6096,151 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('❌ Error fetching MTA Subway trains:', error);
                 console.error('Error details:', error.message);
             }
+        }
+        
+        // Centralized function to determine if a marker should be visible
+        // This ensures consistent visibility logic across all transit systems
+        function shouldShowMarker(markerType, routeId, checkboxId) {
+            // Check if checkbox is checked
+            const checkbox = document.getElementById(checkboxId);
+            if (!checkbox || !checkbox.checked) {
+                return false;
+            }
+            
+            // Check if other systems are highlighted (they take priority)
+            if (markerType === 'subway') {
+                if (highlightedMetroNorthLine || highlightedLIRRLine) {
+                    return false; // Hide subway when Metro North or LIRR is highlighted
+                }
+                if (highlightedSubwayLine) {
+                    // Only show if this route is highlighted
+                    return highlightedSubwayLine === routeId || 
+                           (Array.isArray(highlightedSubwayLine) && highlightedSubwayLine.includes(routeId));
+                }
+            } else if (markerType === 'lirr') {
+                if (highlightedMetroNorthLine || highlightedSubwayLine) {
+                    return false; // Hide LIRR when Metro North or Subway is highlighted
+                }
+                if (highlightedLIRRLine) {
+                    return highlightedLIRRLine === routeId || 
+                           (Array.isArray(highlightedLIRRLine) && highlightedLIRRLine.includes(routeId));
+                }
+            } else if (markerType === 'metroNorth') {
+                if (highlightedLIRRLine || highlightedSubwayLine) {
+                    return false; // Hide Metro North when LIRR or Subway is highlighted
+                }
+                if (highlightedMetroNorthLine) {
+                    return highlightedMetroNorthLine === routeId || 
+                           (Array.isArray(highlightedMetroNorthLine) && highlightedMetroNorthLine.includes(routeId));
+                }
+            }
+            
+            // No highlighting active - show all
+            return true;
+        }
+        
+        // Helper function to re-evaluate visibility of all markers when highlighting changes
+        function updateAllMarkerVisibility() {
+            // Update subway markers
+            mtaSubwayMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    const shouldShow = shouldShowMarker('subway', marker.routeName, 'show-mta-subway-live');
+                    if (shouldShow) {
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    } else {
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    }
+                }
+            });
+            
+            // Update LIRR markers
+            lirrMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    const shouldShow = shouldShowMarker('lirr', marker.routeName, 'show-lirr-live');
+                    if (shouldShow) {
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    } else {
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    }
+                }
+            });
+            
+            // Update Metro North markers
+            metroNorthMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    const shouldShow = shouldShowMarker('metroNorth', marker.routeName, 'show-metro-north-live');
+                    if (shouldShow) {
+                        if (!map.hasLayer(marker)) {
+                            marker.addTo(map);
+                        }
+                    } else {
+                        if (map.hasLayer(marker)) {
+                            map.removeLayer(marker);
+                        }
+                    }
+                }
+            });
+            
+            // Update MBTA train markers
+            trainMarkers.forEach((marker, trainId) => {
+                if (marker && marker.routeName) {
+                    // Determine which checkbox to check based on route type
+                    let checkboxId = null;
+                    if (commuterLines.includes(marker.routeName) || (marker.routeId && marker.routeId.startsWith('CR-'))) {
+                        checkboxId = 'show-commuter-live';
+                    } else if (seasonalLines.includes(marker.routeName)) {
+                        checkboxId = 'show-seasonal-live';
+                    } else if (subwayLines.includes(marker.routeName)) {
+                        checkboxId = 'show-subway-live';
+                    }
+                    
+                    if (checkboxId) {
+                        const checkbox = document.getElementById(checkboxId);
+                        if (checkbox && checkbox.checked) {
+                            // Check if other systems are highlighted (they take priority)
+                            if (highlightedLIRRLine || highlightedSubwayLine || highlightedMetroNorthLine) {
+                                // Other systems are highlighted, hide MBTA trains
+                                if (map.hasLayer(marker)) {
+                                    map.removeLayer(marker);
+                                }
+                            } else if (highlightedLine) {
+                                // MBTA line is highlighted, only show if this train is on that line
+                                const isHighlighted = Array.isArray(highlightedLine)
+                                    ? highlightedLine.includes(marker.routeName)
+                                    : highlightedLine === marker.routeName;
+                                
+                                if (isHighlighted) {
+                                    if (!map.hasLayer(marker)) {
+                                        marker.addTo(map);
+                                    }
+                                } else {
+                                    if (map.hasLayer(marker)) {
+                                        map.removeLayer(marker);
+                                    }
+                                }
+                            } else {
+                                // No highlighting active, show all
+                                if (!map.hasLayer(marker)) {
+                                    marker.addTo(map);
+                                }
+                            }
+                        } else {
+                            // Checkbox unchecked, hide marker
+                            if (map.hasLayer(marker)) {
+                                map.removeLayer(marker);
+                            }
+                        }
+                    }
+                }
+            });
         }
         
         // Function to update MTA Subway train markers on the map
@@ -6667,27 +6759,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     mtaSubwayMarkers.set(trainId, trainMarker);
                     successCount++;
                     
-                    // Check if we should show this marker
-                    const showSubwayLive = document.getElementById('show-mta-subway-live');
-                    let shouldShow = false;
+                    // Use centralized visibility function
+                    const shouldShow = shouldShowMarker('subway', routeId, 'show-mta-subway-live');
                     
-                    if (showSubwayLive && showSubwayLive.checked) {
-                        // Check if highlighting is active
-                        if (highlightedSubwayLine) {
-                            // Highlighting is active - only show trains from the highlighted route(s)
-                            if (highlightedSubwayLine === routeId || 
-                                (Array.isArray(highlightedSubwayLine) && highlightedSubwayLine.includes(routeId))) {
-                                shouldShow = true;
-                            }
-                            // else: shouldShow remains false (hide trains from other routes)
-                        } else {
-                            // No highlighting active - show all trains
-                            shouldShow = true;
-                        }
-                    }
-                    // else: shouldShow remains false (checkbox unchecked)
-                    
-                    // Apply visibility based on shouldShow
+                    // Apply visibility
                     if (shouldShow) {
                         if (!map.hasLayer(trainMarker)) {
                             trainMarker.addTo(map);
@@ -7039,40 +7114,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         const lirrLiveCheckbox = document.getElementById('show-lirr-live');
                         let shouldAddToMap = false;
                         
-                        if (lirrLiveCheckbox && lirrLiveCheckbox.checked) {
-                            // Don't show LIRR trains if MBTA line is highlighted
-                            if (highlightedLine) {
-                                // MBTA line is highlighted, hide all LIRR trains
-                                // Don't add to map or store
-                                return;
-                            }
-                            
-                            // Don't show LIRR trains if subway line is highlighted
-                            if (highlightedSubwayLine) {
-                                // Subway line is highlighted, hide all LIRR trains
-                                // Don't add to map or store
-                                return;
-                            }
-                            
-                            // Check if LIRR highlighting is active
-                            if (highlightedLIRRLine) {
-                                // Only show if this train is on the highlighted line
-                                const isHighlighted = Array.isArray(highlightedLIRRLine)
-                                    ? highlightedLIRRLine.includes(routeName)
-                                    : highlightedLIRRLine === routeName;
-                                
-                                if (isHighlighted) {
-                                    shouldAddToMap = true;
-                                }
-                            } else {
-                                // No highlight active, show all trains
-                                shouldAddToMap = true;
-                            }
-                            
-                            // Only add to map and store if it should be shown
-                            if (shouldAddToMap) {
+                        // Always store the marker
+                        lirrMarkers.set(trainId, trainMarker);
+                        
+                        // Use centralized visibility function
+                        const shouldShow = shouldShowMarker('lirr', routeName, 'show-lirr-live');
+                        
+                        // Apply visibility
+                        if (shouldShow) {
+                            if (!map.hasLayer(trainMarker)) {
                                 trainMarker.addTo(map);
-                                lirrMarkers.set(trainId, trainMarker);
+                            }
+                        } else {
+                            if (map.hasLayer(trainMarker)) {
+                                map.removeLayer(trainMarker);
                             }
                         }
                         
