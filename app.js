@@ -5976,6 +5976,12 @@ document.addEventListener('DOMContentLoaded', function() {
             ];
             
             try {
+                // Check if route data is loaded
+                if (typeof mtaSubwayRoutesData === 'undefined' || !mtaSubwayRoutesData || !mtaSubwayRoutesData.routes) {
+                    console.warn('⚠️ MTA Subway routes data not loaded yet. Waiting for data file...');
+                    return;
+                }
+                
                 const now = Date.now();
                 
                 // Rate limiting - don't update more than once every 5 seconds
@@ -5988,7 +5994,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Load GTFS-RT proto definition (once, reused for all feeds)
                 // Cache the protobuf root to avoid reloading
                 if (!window.mtaSubwayProtobufRoot) {
-                    window.mtaSubwayProtobufRoot = await protobuf.load('./gtfs-realtime.proto');
+                    try {
+                        // Try to determine the correct path for the proto file
+                        // On GitHub Pages, if repo is not username.github.io, base path includes repo name
+                        let protoPath = './gtfs-realtime.proto';
+                        const pathname = window.location.pathname;
+                        // If pathname is like /reponame/ or /reponame/index.html, use that base
+                        if (pathname !== '/' && pathname !== '/index.html') {
+                            const pathParts = pathname.split('/').filter(p => p);
+                            if (pathParts.length > 0 && pathParts[pathParts.length - 1] === 'index.html') {
+                                pathParts.pop(); // Remove index.html
+                            }
+                            if (pathParts.length > 0) {
+                                protoPath = '/' + pathParts.join('/') + '/gtfs-realtime.proto';
+                            }
+                        }
+                        console.log(`Loading GTFS-RT proto from: ${protoPath} (pathname: ${pathname})`);
+                        window.mtaSubwayProtobufRoot = await protobuf.load(protoPath);
+                        console.log('✅ GTFS-RT proto loaded successfully');
+                    } catch (error) {
+                        console.error('❌ Error loading GTFS-RT proto file:', error);
+                        console.error('Current pathname:', window.location.pathname);
+                        console.error('Make sure gtfs-realtime.proto is accessible in the repository root');
+                        throw error; // Re-throw to be caught by outer try-catch
+                    }
                 }
                 const root = window.mtaSubwayProtobufRoot;
                 const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
@@ -5997,11 +6026,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const feedPromises = MTA_SUBWAY_GTFS_RT_URLS.map(async (url) => {
                     try {
                         const response = await fetch(url);
-                        if (!response.ok) return [];
+                        if (!response.ok) {
+                            console.warn(`⚠️ MTA Subway feed returned ${response.status}: ${url}`);
+                            return [];
+                        }
                         const buffer = await response.arrayBuffer();
                         const feed = FeedMessage.decode(new Uint8Array(buffer));
                         return feed.entity.filter(e => e.tripUpdate).map(e => e.tripUpdate);
                     } catch (error) {
+                        console.error(`❌ Error fetching MTA Subway feed ${url}:`, error);
                         return []; // Return empty array on error, continue with other feeds
                     }
                 });
@@ -6017,8 +6050,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const tripsByRoute = new Map();
                 
                 if (tripUpdates.length === 0) {
+                    console.warn('⚠️ No MTA Subway trip updates received from any feed. This may be normal if no trains are running.');
                     return;
                 }
+                
+                console.log(`✅ Received ${tripUpdates.length} MTA Subway trip updates`);
                 
                 // Create reverse lookup map for faster trip matching (route pattern -> route)
                 // This avoids O(n) searches through tripToRoute for each trip
@@ -6791,14 +6827,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Function to start MTA Subway live tracking
         function startMtaSubwayTracking() {
             if (mtaSubwayTrackingInterval) {
+                console.log('MTA Subway tracking already started');
                 return; // Already tracking
             }
+            
+            console.log('🚇 Starting MTA Subway live tracking...');
+            console.log('MTA Subway routes data available:', typeof mtaSubwayRoutesData !== 'undefined' && mtaSubwayRoutesData && mtaSubwayRoutesData.routes);
             
             // Initial fetch
             fetchMtaSubwayTrains();
             
             // Set up interval (update every 10 seconds for subway)
             mtaSubwayTrackingInterval = setInterval(fetchMtaSubwayTrains, 10000);
+            console.log('✅ MTA Subway tracking interval set up');
         }
         
         // Function to stop MTA Subway live tracking
