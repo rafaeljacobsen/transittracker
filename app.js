@@ -6275,7 +6275,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Get stop_times data for this route
                 const routeStopTimes = mtaSubwayRoutesData.routeStopTimes?.[routeId] || {};
-                const tripStopTimes = routeStopTimes.trip_stop_times || {};
                 const avgTravelTimes = routeStopTimes.avg_travel_times || {};
                 const orderedStops = routeStopTimes.ordered_stops || [];
                 
@@ -6339,7 +6338,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                const nextStopId = nextStopUpdate.stopId || nextStopUpdate.stop_id;
+                let nextStopId = nextStopUpdate.stopId || nextStopUpdate.stop_id;
                 const nextStopSequence = nextStopUpdate.stopSequence || nextStopUpdate.stop_sequence;
                 // Prefer arrival time, but use departure time as fallback
                 const nextArrivalTime = nextStopUpdate.arrival?.time || nextStopUpdate.departure?.time;
@@ -6353,44 +6352,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const etaSeconds = nextArrivalTime - now;
                 
                 
-                // Find previous stop using static schedule data
-                // The API doesn't include past stops, so we must use the static schedule
+                // Find previous stop using ordered stops list from static schedule data
+                // The API doesn't include past stops, so we use the ordered stops list
                 let previousStopId = null;
                 let avgTravelTimeSeconds = 120; // Default 2 minutes
                 
-                // METHOD 1: Try to get stop sequence from trip_stop_times (if available)
-                // Note: GTFS-RT trip_id format might differ from static GTFS trip_id
-                // Static format: "AFA25GEN-1038-Sunday-00_067550_1..S03R"
-                // GTFS-RT format: "067550_1..S03R" or similar
-                let tripStops = tripStopTimes[tripId];
-                let matchedTripId = tripId;
-                
-                // If no exact match, try to find a trip that contains this trip_id
-                if (!tripStops) {
-                    // Extract the key part (usually the last segment after underscore)
-                    const tripIdKey = tripId.split('_').pop() || tripId;
-                    
-                    for (const [staticTripId, stops] of Object.entries(tripStopTimes)) {
-                        // Check if static trip_id ends with the GTFS-RT trip_id
-                        if (staticTripId.endsWith(tripId) || staticTripId.includes(tripId)) {
-                            tripStops = stops;
-                            matchedTripId = staticTripId;
-                            break;
-                        }
-                        // Or check if the last segment matches
-                        const staticTripIdKey = staticTripId.split('_').pop();
-                        if (staticTripIdKey === tripIdKey || staticTripIdKey === tripId) {
-                            tripStops = stops;
-                            matchedTripId = staticTripId;
-                            break;
-                        }
-                    }
-                }
-                
-                // If tripStops doesn't contain the next stop (or wasn't found), try to find a trip that does
-                // This handles cases where trip matching found the wrong direction or no trip matched
-                if (!tripStops || tripStops.length === 0 || !tripStops.some(s => s.stop_id === nextStopId)) {
-                    // Try to find a trip that contains this stop (try exact match and variations)
+                // Find the next stop in the ordered stops list
+                if (orderedStops.length > 0) {
+                    // Try to find the next stop (with variations for N/S direction)
                     const stopVariations = [
                         nextStopId,
                         nextStopId.replace(/[NS]$/, '') + 'N',
@@ -6399,68 +6368,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         nextStopId.replace(/S$/, 'N')
                     ];
                     
+                    let nextIndex = -1;
                     for (const variation of stopVariations) {
-                        for (const [staticTripId, stops] of Object.entries(tripStopTimes)) {
-                            const hasStop = stops.some(s => s.stop_id === variation);
-                            if (hasStop) {
-                                tripStops = stops;
-                                matchedTripId = staticTripId;
-                                break;
-                            }
-                        }
-                        if (tripStops) break; // Found a trip, stop searching
-                    }
-                }
-                
-                // METHOD 1: Try to find previous stop using trip-specific stops
-                if (tripStops) {
-                    let currentIndex = -1;
-                    
-                    if (nextStopSequence !== undefined) {
-                        // Try to find by stop_sequence first, then by stop_id
-                        currentIndex = tripStops.findIndex(s => 
-                            (s.stop_sequence === nextStopSequence) || (s.stop_id === nextStopId)
-                        );
-                    } else {
-                        // No stop_sequence, find by stop_id only
-                        currentIndex = tripStops.findIndex(s => s.stop_id === nextStopId);
-                    }
-                    
-                    // If not found, try stop ID variations (N vs S)
-                    if (currentIndex === -1) {
-                        const stopVariations = [
-                            nextStopId.replace(/[NS]$/, '') + 'N',
-                            nextStopId.replace(/[NS]$/, '') + 'S',
-                            nextStopId.replace(/N$/, 'S'),
-                            nextStopId.replace(/S$/, 'N')
-                        ];
-                        for (const variation of stopVariations) {
-                            currentIndex = tripStops.findIndex(s => s.stop_id === variation);
-                            if (currentIndex !== -1) {
-                                // Found a match with variation - use it
-                                break;
-                            }
+                        nextIndex = orderedStops.indexOf(variation);
+                        if (nextIndex !== -1) {
+                            // Found a match - use this variation
+                            nextStopId = variation;
+                            break;
                         }
                     }
                     
-                    if (currentIndex > 0) {
-                        previousStopId = tripStops[currentIndex - 1].stop_id;
-                        // Get average travel time between these stops
-                        const timeKeyStr = `${previousStopId},${nextStopId}`;
-                        if (avgTravelTimes[timeKeyStr] !== undefined) {
-                            avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
-                        }
-                    } else if (currentIndex === 0) {
-                        // Train is at the first stop in the trip
-                        previousStopId = nextStopId;
-                    }
-                    // If currentIndex === -1, next stop not found in this trip's stops, fall through to orderedStops
-                }
-                
-                // METHOD 2: Fallback to ordered stops list (if not found in trip-specific stops, or if no trip match)
-                if (!previousStopId && orderedStops.length > 0) {
-                    const nextIndex = orderedStops.indexOf(nextStopId);
                     if (nextIndex > 0) {
+                        // Found the next stop, get the previous one
                         previousStopId = orderedStops[nextIndex - 1];
                         const timeKeyStr = `${previousStopId},${nextStopId}`;
                         if (avgTravelTimes[timeKeyStr] !== undefined) {
@@ -6471,26 +6390,59 @@ document.addEventListener('DOMContentLoaded', function() {
                         previousStopId = nextStopId;
                     } else {
                         // nextIndex === -1, stop not found in ordered list
-                        // This should never happen if the data is correct
-                        // Check if the stop exists in routeData.stops with a different format
+                        // This likely means the train is going in the opposite direction
+                        // Check if the stop exists in routeData.stops
                         if (routeData && routeData.stops) {
-                            const stopVariations = [
-                                nextStopId,
-                                nextStopId.replace(/[NS]$/, ''), // Remove direction suffix
-                                nextStopId + 'N', // Try with N suffix
-                                nextStopId + 'S'  // Try with S suffix
-                            ];
+                            const nextStopIndex = routeData.stops.findIndex(s => s.stop_id === nextStopId);
                             
-                            for (const variation of stopVariations) {
-                                const foundStop = routeData.stops.find(s => s.stop_id === variation);
-                                if (foundStop) {
-                                    const foundIndex = orderedStops.indexOf(variation);
-                                    if (foundIndex > 0) {
-                                        previousStopId = orderedStops[foundIndex - 1];
+                            if (nextStopIndex > 0) {
+                                // Stop exists in routeData.stops - use the stop immediately before it
+                                previousStopId = routeData.stops[nextStopIndex - 1].stop_id;
+                                
+                                // Try to get travel time - check both directions
+                                const timeKeyStr = `${previousStopId},${nextStopId}`;
+                                if (avgTravelTimes[timeKeyStr] !== undefined) {
+                                    avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
+                                } else {
+                                    // Try reverse direction
+                                    const reverseTimeKeyStr = `${nextStopId},${previousStopId}`;
+                                    if (avgTravelTimes[reverseTimeKeyStr] !== undefined) {
+                                        avgTravelTimeSeconds = avgTravelTimes[reverseTimeKeyStr];
+                                    }
+                                }
+                            } else if (nextStopIndex === 0) {
+                                // Stop is first in routeData.stops
+                                previousStopId = nextStopId;
+                            } else {
+                                // Stop not found in routeData.stops - try stop ID variations
+                                const stopVariations2 = [
+                                    nextStopId.replace(/[NS]$/, '') + 'N',
+                                    nextStopId.replace(/[NS]$/, '') + 'S',
+                                    nextStopId.replace(/N$/, 'S'),
+                                    nextStopId.replace(/S$/, 'N')
+                                ];
+                                
+                                for (const variation of stopVariations2) {
+                                    const foundInOrdered = orderedStops.indexOf(variation);
+                                    if (foundInOrdered > 0) {
+                                        previousStopId = orderedStops[foundInOrdered - 1];
                                         const timeKeyStr = `${previousStopId},${variation}`;
                                         if (avgTravelTimes[timeKeyStr] !== undefined) {
                                             avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
                                         }
+                                        nextStopId = variation; // Update to use the matched variation
+                                        break;
+                                    }
+                                    
+                                    // Also check routeData.stops
+                                    const foundInRoute = routeData.stops.findIndex(s => s.stop_id === variation);
+                                    if (foundInRoute > 0) {
+                                        previousStopId = routeData.stops[foundInRoute - 1].stop_id;
+                                        const timeKeyStr = `${previousStopId},${variation}`;
+                                        if (avgTravelTimes[timeKeyStr] !== undefined) {
+                                            avgTravelTimeSeconds = avgTravelTimes[timeKeyStr];
+                                        }
+                                        nextStopId = variation;
                                         break;
                                     }
                                 }
@@ -6498,67 +6450,91 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         
                         if (!previousStopId) {
-                            // Still not found - this indicates a data mismatch
-                            console.error(`❌ Trip ${tripId}: Next stop ${nextStopId} not found in orderedStops list!`);
-                            console.error(`   This means the stop ID from GTFS-RT doesn't match the static data.`);
+                            // Still not found - use fallback but log error
+                            console.error(`❌ Trip ${tripId}: Could not determine previous stop for next stop ${nextStopId}`);
+                            console.error(`   Route: ${routeId}, Ordered stops count: ${orderedStops.length}`);
                             console.error(`   Ordered stops sample:`, orderedStops.slice(0, 10));
-                            console.error(`   Check if stop ID format differs (e.g., "101" vs "101S")`);
+                            console.error(`   Using fallback: showing train at next stop location`);
+                            
+                            // Fallback: use the next stop as both previous and next
+                            // This shows the train at the station location
+                            previousStopId = nextStopId;
+                            avgTravelTimeSeconds = 60; // Use 1 minute as default
                         }
                     }
                 }
                 
                 if (!previousStopId) {
-                    // Can't determine previous stop from static data - this is an error
-                    skippedNoPreviousStop++;
+                    // Final fallback: use the next stop as both previous and next
+                    console.error(`❌ Trip ${tripId}: Could not determine previous stop for next stop ${nextStopId} (final fallback)`);
+                    console.error(`   Route: ${routeId}, Ordered stops count: ${orderedStops.length}`);
+                    console.error(`   Using fallback: showing train at next stop location`);
                     
-                    // Build detailed error message
-                    const errorDetails = {
-                        tripId: tripId,
-                        nextStopId: nextStopId,
-                        nextStopSequence: nextStopSequence,
-                        tripStopsFound: tripStops ? tripStops.length : 0,
-                        orderedStopsCount: orderedStops.length,
-                        totalTripStopTimesEntries: Object.keys(tripStopTimes).length,
-                        sampleTripIds: Object.keys(tripStopTimes).slice(0, 5),
-                        orderedStopsSample: orderedStops.slice(0, 5),
-                        matchedTripId: matchedTripId !== tripId ? matchedTripId : null
-                    };
-                    
-                    if (tripStops) {
-                        errorDetails.tripStopsSample = tripStops.slice(0, 5).map(s => ({
-                            stop_id: s.stop_id,
-                            stop_sequence: s.stop_sequence
-                        }));
-                        errorDetails.nextStopInTripStops = tripStops.findIndex(s => s.stop_id === nextStopId);
-                    }
-                    
-                    console.error(`❌ ERROR: Trip ${tripId}: Could not determine previous stop for next stop ${nextStopId}`);
-                    console.error(`   Error details:`, errorDetails);
-                    
-                    // Throw error to help debug
-                    throw new Error(`Cannot determine previous stop for trip ${tripId}, next stop ${nextStopId}. See console for details.`);
+                    previousStopId = nextStopId;
+                    avgTravelTimeSeconds = 60; // Use 1 minute as default
                 }
                 
                 
                 // Find stop coordinates - use the same stop objects as in the map markers
                 // This ensures naming consistency between map markers and train tooltips
-                const nextStop = routeData.stops.find(s => s.stop_id === nextStopId);
-                const prevStop = routeData.stops.find(s => s.stop_id === previousStopId);
+                let nextStop = routeData.stops.find(s => s.stop_id === nextStopId);
+                let prevStop = routeData.stops.find(s => s.stop_id === previousStopId);
+                
+                // If stop not found in current route, search all routes (for shared stops)
+                if (!nextStop && mtaSubwayRoutesData && mtaSubwayRoutesData.routes) {
+                    for (const [otherRouteId, otherRouteData] of Object.entries(mtaSubwayRoutesData.routes)) {
+                        const foundStop = otherRouteData.stops?.find(s => s.stop_id === nextStopId);
+                        if (foundStop) {
+                            nextStop = foundStop;
+                            console.warn(`⚠️ Trip ${tripId}: Next stop ${nextStopId} found in route ${otherRouteId} (shared stop), not in route ${routeId}`);
+                            break;
+                        }
+                    }
+                }
+                
+                if (!prevStop && mtaSubwayRoutesData && mtaSubwayRoutesData.routes) {
+                    for (const [otherRouteId, otherRouteData] of Object.entries(mtaSubwayRoutesData.routes)) {
+                        const foundStop = otherRouteData.stops?.find(s => s.stop_id === previousStopId);
+                        if (foundStop) {
+                            prevStop = foundStop;
+                            break;
+                        }
+                    }
+                }
                 
                 if (!nextStop) {
-                    skippedStopNotFound++;
-                    if (skippedStopNotFound <= 3) {
-                        console.warn(`⚠️ Trip ${tripId}: Next stop ${nextStopId} not found in routeData.stops`);
-                        console.warn(`   Available stops in route:`, routeData.stops.slice(0, 5).map(s => s.stop_id));
+                    // Still not found - use fallback coordinates
+                    console.error(`❌ Trip ${tripId}: Next stop ${nextStopId} not found in any route's stops`);
+                    console.error(`   Route: ${routeId}, Available stops in route:`, routeData.stops.slice(0, 5).map(s => s.stop_id));
+                    // Use a default location (will show train but may be inaccurate)
+                    // Try to find any stop with similar ID pattern
+                    const baseStopId = nextStopId.replace(/[NS]$/, '');
+                    const similarStop = routeData.stops.find(s => s.stop_id.startsWith(baseStopId));
+                    if (similarStop) {
+                        nextStop = similarStop;
+                        console.warn(`   Using similar stop ${similarStop.stop_id} as fallback`);
+                    } else {
+                        // Last resort: use first stop in route
+                        if (routeData.stops.length > 0) {
+                            nextStop = routeData.stops[0];
+                            console.warn(`   Using first stop in route ${routeData.stops[0].stop_id} as fallback`);
+                        }
                     }
-                    return;
                 }
                 
                 if (!prevStop) {
-                    skippedStopNotFound++;
-                    if (skippedStopNotFound <= 3) {
+                    // Use nextStop as fallback for prevStop
+                    prevStop = nextStop;
+                    if (prevStop) {
+                        console.warn(`⚠️ Trip ${tripId}: Previous stop ${previousStopId} not found, using next stop as fallback`);
                     }
-                    return;
+                }
+                
+                // Final check - if we still don't have stops, we can't display the train
+                if (!nextStop || !prevStop) {
+                    console.error(`❌ Trip ${tripId}: Cannot display train - missing stop data`);
+                    console.error(`   Next stop found: ${!!nextStop}, Prev stop found: ${!!prevStop}`);
+                    return; // Can't display without coordinates
                 }
                 
                 // Handle case where previous and next stops are the same (train at station)
@@ -6665,9 +6641,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 const baseIconSize = 20;
                 const currentZoom = map.getZoom();
                 const iconSize = getIconSize(baseIconSize, currentZoom);
-                // Use correct icon for each route (lowercase for letter routes)
-                const iconName = routeId.toLowerCase();
-                const iconUrl = `icons/${iconName}.png`;
+                
+                // Helper function to get icon URL with fallback logic
+                function getRouteIconUrl(routeId) {
+                    const iconName = routeId.toLowerCase();
+                    // List of known icon files (from icons directory)
+                    const knownIcons = ['1', '2', '3', '4', '5', '6', '6d', '7', '7d', 'a', 'b', 'c', 'd', 'e', 'f', 'fd', 'g', 'h', 'j', 'l', 'm', 'n', 'q', 'r', 's', 'sf', 'sir', 'sr', 't', 'w', 'z'];
+                    
+                    // Try exact match first
+                    if (knownIcons.includes(iconName)) {
+                        return `icons/${iconName}.png`;
+                    }
+                    
+                    // Try base route for variants (e.g., "7x" -> "7", "7d" -> "7")
+                    // Remove trailing letter if it's a variant indicator
+                    if (iconName.length > 1) {
+                        const baseRoute = iconName.replace(/[a-z]$/, ''); // Remove trailing letter
+                        if (baseRoute && knownIcons.includes(baseRoute)) {
+                            return `icons/${baseRoute}.png`;
+                        }
+                    }
+                    
+                    // Final fallback: use MTA circle icon
+                    return 'icons/mtacirc.png';
+                }
+                
+                const iconUrl = getRouteIconUrl(routeId);
                 const color = routeData.color || '#EE352E';
                 
                 // Get headsign/destination from GTFS-RT feed

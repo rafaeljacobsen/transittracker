@@ -347,33 +347,24 @@ class MTASubwayDataParser:
         
         # Also create ordered stop list for the route (using most common trip pattern)
         # Find the trip with most stops (likely the full route)
-        longest_trip = None
         if trip_stop_times:
             longest_trip = max(trip_stop_times.items(), key=lambda x: len(x[1]))
             ordered_stops = [stop['stop_id'] for stop in longest_trip[1]]
         else:
             ordered_stops = []
         
-        # OPTIMIZATION: Only keep the longest trip per route (most complete route pattern)
-        # This dramatically reduces file size - we only need ONE trip per route to get the stop order
-        # The JavaScript can use ordered_stops and avg_travel_times for most cases
-        # trip_stop_times is only used as a fallback for trip matching
-        optimized_trip_stop_times = {}
-        
-        if trip_stop_times and longest_trip:
-            # Only keep the longest trip (most complete route) - this is enough for trip matching
-            longest_trip_id, longest_trip_stops = longest_trip
-            optimized_trip_stop_times[longest_trip_id] = longest_trip_stops
+        # OPTIMIZATION: Remove trip_stop_times entirely to reduce file size
+        # We only need ordered_stops (the stop sequence) and avg_travel_times (travel times between stops)
+        # The JavaScript code will use orderedStops directly, which is more reliable anyway
         
         result = {
-            'trip_stop_times': optimized_trip_stop_times,  # Only representative trips (much smaller!)
             'avg_travel_times': avg_stop_times,  # (prev_stop_id, next_stop_id) -> seconds
-            'ordered_stops': ordered_stops  # Most common stop order
+            'ordered_stops': ordered_stops  # Most common stop order (from longest trip)
         }
         
-        print(f"✅ Parsed {len(trip_stop_times)} trips total")
-        print(f"   Keeping {len(optimized_trip_stop_times)} representative trips (optimized for file size)")
+        print(f"✅ Parsed {len(trip_stop_times)} trips to calculate averages")
         print(f"   Calculated {len(avg_stop_times)} average travel times between stop pairs")
+        print(f"   Generated ordered stops list with {len(ordered_stops)} stops")
         return result
     
     def parse_gtfs_time(self, time_str):
