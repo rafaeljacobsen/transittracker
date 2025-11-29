@@ -6312,13 +6312,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Get stop_times data for this route
                 const routeStopTimes = mtaSubwayRoutesData.routeStopTimes?.[routeId] || {};
                 const avgTravelTimes = routeStopTimes.avg_travel_times || {};
-                const orderedStops = routeStopTimes.ordered_stops || [];
+                let orderedStops = routeStopTimes.ordered_stops || [];
                 
+                // Validate that ordered stops actually belong to this route
+                // If ordered stops don't match route stops, use route stops as fallback
+                if (orderedStops.length > 0 && routeData.stops && routeData.stops.length > 0) {
+                    const routeStopIds = new Set(routeData.stops.map(s => s.stop_id));
+                    const matchingStops = orderedStops.filter(stopId => routeStopIds.has(stopId));
+                    
+                    // If less than 50% of ordered stops match route stops, the data is likely wrong
+                    if (matchingStops.length < orderedStops.length * 0.5) {
+                        console.warn(`⚠️ Route ${routeId}: Ordered stops don't match route stops (${matchingStops.length}/${orderedStops.length} match). Using route stops as fallback.`);
+                        // Use route stops as ordered stops (sorted by stop_id for consistency)
+                        orderedStops = routeData.stops.map(s => s.stop_id).sort();
+                    } else if (matchingStops.length < orderedStops.length) {
+                        // Some stops match, filter to only matching stops
+                        orderedStops = matchingStops;
+                    }
+                }
                 
-                // CRITICAL: If orderedStops is empty, we cannot determine previous stops
+                // CRITICAL: If orderedStops is empty, try to use route stops as fallback
                 if (orderedStops.length === 0) {
-                    // Skip this route if we don't have stop_times data
-                    return;
+                    if (routeData.stops && routeData.stops.length > 0) {
+                        // Use route stops as ordered stops (sorted by stop_id)
+                        orderedStops = routeData.stops.map(s => s.stop_id).sort();
+                        console.warn(`⚠️ Route ${routeId}: No ordered stops in routeStopTimes, using route stops as fallback (${orderedStops.length} stops)`);
+                    } else {
+                        // Skip this route if we don't have any stop data
+                        console.warn(`⚠️ Route ${routeId}: No stop data available, skipping`);
+                        return;
+                    }
                 }
                 
                 // Track why trains are being filtered out for this route
@@ -6451,14 +6474,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                 previousStopId = nextStopId;
                             } else {
                                 // Stop not found in routeData.stops - try stop ID variations
+                                const baseStopId = nextStopId.replace(/[NS]$/, '');
                                 const stopVariations2 = [
-                                    nextStopId.replace(/[NS]$/, '') + 'N',
-                                    nextStopId.replace(/[NS]$/, '') + 'S',
+                                    baseStopId + 'N',
+                                    baseStopId + 'S',
                                     nextStopId.replace(/N$/, 'S'),
-                                    nextStopId.replace(/S$/, 'N')
+                                    nextStopId.replace(/S$/, 'N'),
+                                    baseStopId // Try without direction suffix
                                 ];
                                 
                                 for (const variation of stopVariations2) {
+                                    // Check ordered stops first
                                     const foundInOrdered = orderedStops.indexOf(variation);
                                     if (foundInOrdered > 0) {
                                         previousStopId = orderedStops[foundInOrdered - 1];
@@ -6481,16 +6507,30 @@ document.addEventListener('DOMContentLoaded', function() {
                                         nextStopId = variation;
                                         break;
                                     }
+                                    
+                                    // Try partial match (stop ID contains variation or vice versa)
+                                    const partialMatch = routeData.stops.find(s => 
+                                        s.stop_id.includes(variation) || variation.includes(s.stop_id)
+                                    );
+                                    if (partialMatch && routeData.stops.indexOf(partialMatch) > 0) {
+                                        const partialIndex = routeData.stops.indexOf(partialMatch);
+                                        previousStopId = routeData.stops[partialIndex - 1].stop_id;
+                                        nextStopId = partialMatch.stop_id;
+                                        break;
+                                    }
                                 }
                             }
                         }
                         
                         if (!previousStopId) {
-                            // Still not found - use fallback but log error
-                            console.error(`❌ Trip ${tripId}: Could not determine previous stop for next stop ${nextStopId}`);
-                            console.error(`   Route: ${routeId}, Ordered stops count: ${orderedStops.length}`);
-                            console.error(`   Ordered stops sample:`, orderedStops.slice(0, 10));
-                            console.error(`   Using fallback: showing train at next stop location`);
+                            // Still not found - use fallback (only log once per trip to reduce noise)
+                            if (!window.mtaSubwayStopWarnings || !window.mtaSubwayStopWarnings.has(tripId)) {
+                                if (!window.mtaSubwayStopWarnings) {
+                                    window.mtaSubwayStopWarnings = new Set();
+                                }
+                                window.mtaSubwayStopWarnings.add(tripId);
+                                console.warn(`⚠️ Trip ${tripId}: Could not determine previous stop for ${nextStopId} in route ${routeId}. Using fallback.`);
+                            }
                             
                             // Fallback: use the next stop as both previous and next
                             // This shows the train at the station location
@@ -6502,10 +6542,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (!previousStopId) {
                     // Final fallback: use the next stop as both previous and next
-                    console.error(`❌ Trip ${tripId}: Could not determine previous stop for next stop ${nextStopId} (final fallback)`);
-                    console.error(`   Route: ${routeId}, Ordered stops count: ${orderedStops.length}`);
-                    console.error(`   Using fallback: showing train at next stop location`);
-                    
+                    // (Error already logged above if we got here)
                     previousStopId = nextStopId;
                     avgTravelTimeSeconds = 60; // Use 1 minute as default
                 }
@@ -6540,20 +6577,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (!nextStop) {
                     // Still not found - use fallback coordinates
-                    console.error(`❌ Trip ${tripId}: Next stop ${nextStopId} not found in any route's stops`);
-                    console.error(`   Route: ${routeId}, Available stops in route:`, routeData.stops.slice(0, 5).map(s => s.stop_id));
+                    // Only log once per trip to reduce noise
+                    if (!window.mtaSubwayStopWarnings || !window.mtaSubwayStopWarnings.has(`stop-${tripId}-${nextStopId}`)) {
+                        if (!window.mtaSubwayStopWarnings) {
+                            window.mtaSubwayStopWarnings = new Set();
+                        }
+                        window.mtaSubwayStopWarnings.add(`stop-${tripId}-${nextStopId}`);
+                        console.warn(`⚠️ Trip ${tripId}: Stop ${nextStopId} not found in route ${routeId}, using fallback`);
+                    }
                     // Use a default location (will show train but may be inaccurate)
                     // Try to find any stop with similar ID pattern
                     const baseStopId = nextStopId.replace(/[NS]$/, '');
                     const similarStop = routeData.stops.find(s => s.stop_id.startsWith(baseStopId));
                     if (similarStop) {
                         nextStop = similarStop;
-                        console.warn(`   Using similar stop ${similarStop.stop_id} as fallback`);
                     } else {
                         // Last resort: use first stop in route
                         if (routeData.stops.length > 0) {
                             nextStop = routeData.stops[0];
-                            console.warn(`   Using first stop in route ${routeData.stops[0].stop_id} as fallback`);
                         }
                     }
                 }
@@ -6561,9 +6602,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!prevStop) {
                     // Use nextStop as fallback for prevStop
                     prevStop = nextStop;
-                    if (prevStop) {
-                        console.warn(`⚠️ Trip ${tripId}: Previous stop ${previousStopId} not found, using next stop as fallback`);
-                    }
+                    // (Warning already logged above if we got here)
                 }
                 
                 // Final check - if we still don't have stops, we can't display the train
