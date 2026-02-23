@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Download CTrail Shore Line East GTFS Data
-Downloads the latest Shore Line East GTFS feed and extracts it to the shore_line_east_gtfs/ directory
+Download Amtrak GTFS Data (includes Shore Line East)
+Downloads the latest Amtrak GTFS feed (which includes all Amtrak routes plus Shore Line East)
+and extracts it to the shore_line_east_gtfs/ directory
+
+Note: This feed contains all Amtrak routes. Use parse-amtrak-data.py to parse Amtrak routes
+and parse-ctrail-shore-line-east-data.py to parse only Shore Line East routes.
 """
 
 import requests
@@ -11,21 +15,22 @@ from pathlib import Path
 import shutil
 from datetime import datetime
 
-# CTrail Shore Line East GTFS Feed URL (provided by Amtrak)
-SHORE_LINE_EAST_GTFS_URL = "https://content.amtrak.com/content/gtfs/GTFS.zip"
+# Amtrak GTFS Feed URL (includes all Amtrak routes plus Shore Line East)
+AMTRAK_GTFS_URL = "https://content.amtrak.com/content/gtfs/GTFS.zip"
 
-def download_shore_line_east_gtfs():
-    """Download and extract Shore Line East GTFS data"""
+def download_amtrak_gtfs():
+    """Download and extract Amtrak GTFS data (includes Shore Line East)"""
     print("=" * 60)
-    print("CTRAIL SHORE LINE EAST GTFS DOWNLOADER")
+    print("AMTRAK GTFS DOWNLOADER")
     print("=" * 60)
-    print(f"Downloading from: {SHORE_LINE_EAST_GTFS_URL}")
+    print(f"Downloading from: {AMTRAK_GTFS_URL}")
+    print("Note: This feed includes all Amtrak routes plus Shore Line East")
     print()
     
     try:
         # Download the GTFS zip file
-        print("📥 Downloading Shore Line East GTFS data...")
-        response = requests.get(SHORE_LINE_EAST_GTFS_URL, timeout=120)
+        print("📥 Downloading Amtrak GTFS data...")
+        response = requests.get(AMTRAK_GTFS_URL, timeout=120)
         response.raise_for_status()
         
         file_size_mb = len(response.content) / 1024 / 1024
@@ -73,7 +78,9 @@ def download_shore_line_east_gtfs():
         print(f"📊 Total Files: {len(file_list)}")
         print(f"📏 Total Size: {file_size_mb:.2f} MB")
         print()
-        print("✨ Ready to parse! Run scripts/parse-ctrail-shore-line-east-data.py to generate data.")
+        print("✨ Ready to parse!")
+        print("   - Run scripts/parse-ctrail-shore-line-east-data.py for Shore Line East only")
+        print("   - Run scripts/parse-amtrak-data.py for all Amtrak routes")
         
         return True
         
@@ -89,13 +96,14 @@ def download_shore_line_east_gtfs():
 
 def main():
     """Main function"""
-    success = download_shore_line_east_gtfs()
+    success = download_amtrak_gtfs()
     
     if success:
         print("\n🎉 Success! You can now run:")
-        print("   - python scripts/parse-ctrail-shore-line-east-data.py")
+        print("   - python scripts/parse-ctrail-shore-line-east-data.py (for Shore Line East only)")
+        print("   - python scripts/parse-amtrak-data.py (for all Amtrak routes)")
         print()
-        print("💡 Note: Shore Line East data is ready for your transit tracker!")
+        print("💡 Note: Amtrak GTFS data is ready for your transit tracker!")
     else:
         print("\n⚠️  Download failed. Please check your internet connection and try again.")
         return 1
@@ -104,4 +112,6 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
+
+
 

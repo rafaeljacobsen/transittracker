@@ -188,14 +188,34 @@ class MTASubwayDataParser:
         
         # Map route_id -> list of shape_ids
         route_shapes = defaultdict(set)
+        routes_without_shapes = defaultdict(int)
         for row in trips_data:
-            route_id = row.get('route_id', '')
-            shape_id = row.get('shape_id', '')
-            if route_id and shape_id:
-                route_shapes[route_id].add(shape_id)
+            route_id = row.get('route_id', '').strip()  # Strip whitespace
+            shape_id = row.get('shape_id', '').strip()  # Strip whitespace
+            if route_id:
+                if shape_id:
+                    route_shapes[route_id].add(shape_id)
+                else:
+                    routes_without_shapes[route_id] += 1
+        
+        # Debug: Show routes that have trips but no shapes
+        if routes_without_shapes:
+            print(f"   ⚠️ Routes with trips but no shape_id: {dict(list(routes_without_shapes.items())[:10])}")
+            if 'B' in routes_without_shapes:
+                print(f"   🔵 B train has {routes_without_shapes['B']} trips without shape_id!")
         
         # Convert sets to lists
         route_shapes = {k: list(v) for k, v in route_shapes.items()}
+        
+        # Debug: Show routes with B in the name
+        b_routes = {k: len(v) for k, v in route_shapes.items() if 'B' in k.upper()}
+        if b_routes:
+            print(f"   🔵 Routes with 'B' in route_id: {b_routes}")
+        else:
+            print(f"   ⚠️ No routes with 'B' found in route_shapes_map!")
+            # Show all route_ids to help debug
+            all_route_ids = sorted(route_shapes.keys())
+            print(f"   All route_ids in map ({len(all_route_ids)} total): {all_route_ids}")
         
         print(f"✅ Mapped {len(route_shapes)} routes to shapes")
         return route_shapes
@@ -216,11 +236,19 @@ class MTASubwayDataParser:
         
         # Map trip_id -> route_id
         trip_to_route = {}
+        # Debug: Find what route_id is used for B train trips
+        b_trip_route_ids = set()
         for row in trips_data:
             trip_id = row.get('trip_id', '')
-            route_id = row.get('route_id', '')
+            route_id = row.get('route_id', '').strip()
             if trip_id and route_id:
                 trip_to_route[trip_id] = route_id
+                # Check if this trip looks like it's for B train (trip_id contains B)
+                if 'B' in trip_id.upper() or route_id.upper() == 'B':
+                    b_trip_route_ids.add(route_id)
+        
+        if b_trip_route_ids:
+            print(f"   🔵 Route IDs found for B train trips: {sorted(b_trip_route_ids)}")
         
         # Map route_id -> set of stop_ids
         route_stops = defaultdict(set)
@@ -391,6 +419,16 @@ class MTASubwayDataParser:
         stops_full = self.parse_stops()
         trip_to_route_map, trip_to_headsign_map = self.map_trips_to_routes()
         
+        # Debug: Check for route_id mismatches
+        routes_route_ids = {r['route_id'].strip() for r in routes}
+        shapes_route_ids = set(route_shapes_map.keys())
+        missing_in_shapes = routes_route_ids - shapes_route_ids
+        if missing_in_shapes:
+            print(f"\n⚠️ Routes in routes.txt but NOT in route_shapes_map: {sorted(missing_in_shapes)}")
+        extra_in_shapes = shapes_route_ids - routes_route_ids
+        if extra_in_shapes:
+            print(f"⚠️ Routes in route_shapes_map but NOT in routes.txt: {sorted(extra_in_shapes)[:10]}...")
+        
         # Parse stop_times for all routes (for live tracking)
         print("\n⏱️  Parsing stop times for all routes...")
         route_stop_times = {}
@@ -419,23 +457,107 @@ class MTASubwayDataParser:
             'routes': {}
         }
         
+        print(f"\n📊 Processing {len(routes)} routes to generate route data...")
         for route in routes:
-            route_id = route['route_id']
-            route_short_name = route['route_short_name']
+            route_id = route['route_id'].strip()  # Strip whitespace
+            route_short_name = route['route_short_name'].strip()  # Strip whitespace
             shape_ids = route_shapes_map.get(route_id, [])
+            
+            # Get stop_ids first (needed for B train fallback)
             stop_ids = route_stops_map.get(route_id, [])
+            
+            # Debug: Log when processing B train
+            if route_short_name == 'B':
+                print(f"\n🔵 Processing B train: route_id='{route_id}', initial shape_ids={len(shape_ids)}")
+            
+            # Fallback: If no shapes found by route_id, try matching by route_short_name
+            if not shape_ids and route_short_name:
+                # Look for route_ids in the map that might match this route_short_name
+                # This handles cases where route_id format differs between files
+                for map_route_id, map_shape_ids in route_shapes_map.items():
+                    if route_short_name.upper() in map_route_id.upper() or map_route_id.upper() in route_short_name.upper():
+                        shape_ids = map_shape_ids
+                        print(f"   ⚠️ Route {route_short_name}: route_id '{route_id}' not found, using '{map_route_id}' instead")
+                        break
+            
+            # Special case: B train shares tracks with D, F, M (all on same line)
+            # If B train has no shapes, use shapes from D, F, or M that pass through B stops
+            if not shape_ids and route_short_name == 'B':
+                print(f"\n   🔵 B train has no shapes, looking for shared shapes from D/F/M routes...")
+                # Get B train stop IDs
+                b_stop_ids = {stop_id for stop_id in stop_ids}
+                print(f"   🔵 B train has {len(b_stop_ids)} stops")
+                
+                # Try to find shapes from D, F, or M that include B train stops
+                # Prefer D first (most similar route), then F, then M
+                for related_route_short_name in ['D', 'F', 'M']:
+                    # Find the route_id for this related route
+                    related_route_id = None
+                    for r in routes:
+                        if r['route_short_name'].strip() == related_route_short_name:
+                            related_route_id = r['route_id'].strip()
+                            break
+                    
+                    if related_route_id and related_route_id in route_shapes_map:
+                        related_shape_ids = route_shapes_map[related_route_id]
+                        related_stop_ids = route_stops_map.get(related_route_id, [])
+                        related_stop_set = set(related_stop_ids)
+                        
+                        print(f"   🔵 Checking {related_route_short_name} route (route_id: {related_route_id}): {len(related_stop_ids)} stops, {len(related_shape_ids)} shapes")
+                        
+                        # Check if routes share significant stops (at least 5 common stops)
+                        common_stops = b_stop_ids & related_stop_set
+                        print(f"   🔵 Common stops between B and {related_route_short_name}: {len(common_stops)}")
+                        if len(common_stops) >= 5:
+                            print(f"   ✅ Found {len(common_stops)} common stops with {related_route_short_name} route, using its {len(related_shape_ids)} shapes")
+                            shape_ids = related_shape_ids
+                            break
+                        else:
+                            print(f"   ⚠️ Only {len(common_stops)} common stops with {related_route_short_name} (need 5+)")
+                
+                if not shape_ids:
+                    print(f"   ⚠️ Could not find shared shapes for B train")
+                else:
+                    print(f"   ✅ B train will use {len(shape_ids)} shapes from shared route")
+            
+            # Debug output for B train
+            if route_short_name == 'B':
+                print(f"\n🔵 DEBUG: Processing B train")
+                print(f"   route_id: '{route_id}'")
+                print(f"   route_short_name: '{route_short_name}'")
+                print(f"   route_id in route_shapes_map: {route_id in route_shapes_map}")
+                print(f"   shape_ids found AFTER fallback: {len(shape_ids)}")
+                print(f"   shape_ids: {shape_ids[:5] if shape_ids else '[]'}...")
+                print(f"   stop_ids found: {len(stop_ids)}")
             
             # Get coordinates for all shapes of this route
             route_shapes = []
+            shapes_filtered_out = 0
+            shapes_not_found = 0
             for shape_id in shape_ids:
                 if shape_id in shapes:
                     coords = shapes[shape_id]
                     # Filter out very short shapes (likely connecting segments)
-                    if len(coords) >= 10:  # Minimum points for a valid route segment
+                    # Lowered threshold from 10 to 2 to include more shapes
+                    if len(coords) >= 2:  # Minimum points for a valid route segment (at least 2 for a line)
                         route_shapes.append({
                             'shape_id': shape_id,
                             'coords': coords
                         })
+                    else:
+                        shapes_filtered_out += 1
+                        if route_short_name == 'B':
+                            print(f"   ⚠️ Shape {shape_id} filtered out (only {len(coords)} points, need 2+)")
+                else:
+                    shapes_not_found += 1
+                    if route_short_name == 'B':
+                        print(f"   ⚠️ Shape {shape_id} not found in shapes dictionary")
+            
+            # Debug output for B train
+            if route_short_name == 'B':
+                print(f"   ✅ Final route_shapes count: {len(route_shapes)}")
+                print(f"   ⚠️ Shapes filtered out: {shapes_filtered_out}")
+                print(f"   ⚠️ Shapes not found: {shapes_not_found}")
             
             # Get stop information for this route
             route_stops_list = []

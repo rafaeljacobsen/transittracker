@@ -39,23 +39,29 @@ class ShoreLineEastDataParser:
             return []
     
     def parse_routes(self):
-        """Parse routes.txt to get Shore Line East route information"""
+        """Parse routes.txt to get Shore Line East route information (agency_id 1230 only)"""
         print("\n🚂 Parsing Shore Line East routes...")
         routes_data = self.read_csv_from_file('routes.txt')
         
         routes = []
         for row in routes_data:
+            # Only include routes with agency_id 1230 (Shore Line East)
+            agency_id = row.get('agency_id', '')
+            if agency_id != '1230':
+                continue
+                
             route = {
                 'route_id': row.get('route_id', ''),
                 'route_short_name': row.get('route_short_name', ''),
                 'route_long_name': row.get('route_long_name', ''),
                 'route_type': row.get('route_type', ''),  # 2 = Rail
                 'route_color': row.get('route_color', '003366'),  # CTrail blue default
-                'route_text_color': row.get('route_text_color', 'FFFFFF')
+                'route_text_color': row.get('route_text_color', 'FFFFFF'),
+                'agency_id': agency_id
             }
             routes.append(route)
         
-        print(f"✅ Found {len(routes)} Shore Line East routes")
+        print(f"✅ Found {len(routes)} Shore Line East routes (filtered by agency_id 1230)")
         
         return routes
     
@@ -218,6 +224,19 @@ class ShoreLineEastDataParser:
         stops_full = self.parse_stops()
         trip_to_route_map, trip_to_headsign_map, trip_short_name_to_route_map, trip_short_name_to_headsign_map = self.map_trips_to_routes()
         
+        # Get list of Shore Line East route_ids for filtering
+        shore_line_east_route_ids = {route['route_id'] for route in routes}
+        
+        # Filter trip mappings to only include Shore Line East routes
+        filtered_trip_to_route = {trip_id: route_id for trip_id, route_id in trip_to_route_map.items() 
+                                   if route_id in shore_line_east_route_ids}
+        filtered_trip_to_headsign = {trip_id: headsign for trip_id, headsign in trip_to_headsign_map.items() 
+                                     if trip_id in filtered_trip_to_route}
+        filtered_trip_short_name_to_route = {trip_short_name: route_id for trip_short_name, route_id in trip_short_name_to_route_map.items() 
+                                            if route_id in shore_line_east_route_ids}
+        filtered_trip_short_name_to_headsign = {trip_short_name: headsign for trip_short_name, headsign in trip_short_name_to_headsign_map.items() 
+                                                if trip_short_name in filtered_trip_short_name_to_route}
+        
         # Create stop_id -> full stop details mapping
         stop_details = {}
         for stop in stops_full:
@@ -229,17 +248,18 @@ class ShoreLineEastDataParser:
             'source': 'CTrail Shore Line East GTFS',
             'agency': 'Shore Line East',
             'totalRoutes': len(routes),
-            'tripToRoute': trip_to_route_map,
-            'tripToHeadsign': trip_to_headsign_map,
-            'tripShortNameToRoute': trip_short_name_to_route_map,
-            'tripShortNameToHeadsign': trip_short_name_to_headsign_map,
+            'tripToRoute': filtered_trip_to_route,
+            'tripToHeadsign': filtered_trip_to_headsign,
+            'tripShortNameToRoute': filtered_trip_short_name_to_route,
+            'tripShortNameToHeadsign': filtered_trip_short_name_to_headsign,
             'routes': {}
         }
         
         for route in routes:
             route_id = route['route_id']
-            shape_ids = route_shapes_map.get(route_id, [])
-            stop_ids = route_stops_map.get(route_id, [])
+            # Only get shapes and stops for Shore Line East routes
+            shape_ids = route_shapes_map.get(route_id, []) if route_id in shore_line_east_route_ids else []
+            stop_ids = route_stops_map.get(route_id, []) if route_id in shore_line_east_route_ids else []
             
             # Get coordinates for all shapes of this route
             route_shapes = []
@@ -273,7 +293,8 @@ class ShoreLineEastDataParser:
                 'text_color': f"#{route['route_text_color']}",
                 'shapes': route_shapes,
                 'stops': route_stops_list,
-                'type': 'commuter_rail'
+                'type': 'commuter_rail',
+                'agency_id': route.get('agency_id', '1230')
             }
         
         return route_data
@@ -354,4 +375,6 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
+
+
 
