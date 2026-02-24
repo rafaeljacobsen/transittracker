@@ -2,3 +2,4 @@
 .env.local
 .env.*.local
 node_modules/
+septa_gtfs/google_bus/stop_times.txt
