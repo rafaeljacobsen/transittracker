@@ -111,6 +111,8 @@
             <div class="transit-tabs">
                 <button class="tab-button" onclick="switchTab('mbta')">MBTA</button>
                 <button class="tab-button active" onclick="switchTab('mta')">MTA</button>
+                <button class="tab-button" onclick="switchTab('nj-transit')">NJ Transit</button>
+                <button class="tab-button" onclick="switchTab('septa')">SEPTA</button>
                 <button class="tab-button" onclick="switchTab('ctrail')">CTrail</button>
                 <button class="tab-button" onclick="switchTab('amtrak')">Amtrak</button>
             </div>
@@ -291,6 +293,92 @@
                 </div>
             </div>
             
+            <!-- NJ Transit Tab Content -->
+            <div id="nj-transit-tab" class="tab-content">
+                <div class="agency-header">NJ Transit (New Jersey)</div>
+                
+                <div class="filter-controls">
+                    <div class="filter-header">
+                        <h4>Show/Hide</h4>
+                        <button class="lines-toggle" onclick="toggleLinesSection('nj-transit')" title="Hide/Show Lines Section">−</button>
+                    </div>
+                    
+                    <div class="category-filters" id="nj-transit-lines-section">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: 5px; font-size: 12px;">Service</th>
+                                    <th style="text-align: center; padding: 5px; font-size: 12px;">Paths</th>
+                                    <th style="text-align: center; padding: 5px; font-size: 12px;">Live</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 5px; font-size: 12px;">Rail</td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-nj-transit-paths" checked>
+                                    </td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-nj-transit-live">
+                                    </td>
+                                </tr>
+                                <tr id="nj-transit-loading-indicator" style="display: none;">
+                                    <td colspan="3" style="padding: 5px; font-size: 11px; text-align: center; color: #008C45;">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                            <div style="width: 12px; height: 12px; border: 2px solid #008C45; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                            <span id="nj-transit-loading-text">Loading NJ Transit routes...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SEPTA Tab Content -->
+            <div id="septa-tab" class="tab-content">
+                <div class="agency-header">SEPTA (Philadelphia)</div>
+                
+                <div class="filter-controls">
+                    <div class="filter-header">
+                        <h4>Show/Hide</h4>
+                        <button class="lines-toggle" onclick="toggleLinesSection('septa')" title="Hide/Show Lines Section">−</button>
+                    </div>
+                    
+                    <div class="category-filters" id="septa-lines-section">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: 5px; font-size: 12px;">Service</th>
+                                    <th style="text-align: center; padding: 5px; font-size: 12px;">Paths</th>
+                                    <th style="text-align: center; padding: 5px; font-size: 12px;">Live</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 5px; font-size: 12px;">Rail</td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-septa-paths" checked>
+                                    </td>
+                                    <td style="text-align: center; padding: 5px;">
+                                        <input type="checkbox" id="show-septa-live">
+                                    </td>
+                                </tr>
+                                <tr id="septa-loading-indicator" style="display: none;">
+                                    <td colspan="3" style="padding: 5px; font-size: 11px; text-align: center; color: #1F4E79;">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                            <div style="width: 12px; height: 12px; border: 2px solid #1F4E79; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                            <span id="septa-loading-text">Loading SEPTA routes...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
             <!-- CTrail Tab Content -->
             <div id="ctrail-tab" class="tab-content">
                 <div class="agency-header">CTrail (Connecticut)</div>
@@ -379,7 +467,7 @@
                                         <input type="checkbox" id="show-amtrak-paths" checked>
                                     </td>
                                     <td style="text-align: center; padding: 5px;">
-                                        <input type="checkbox" id="show-amtrak-live" disabled title="Live tracking not available">
+                                        <input type="checkbox" id="show-amtrak-live" checked title="Show live Amtrak train positions">
                                     </td>
                                 </tr>
                                 <tr id="amtrak-loading-indicator" style="display: none;">
@@ -459,6 +547,15 @@
         let hartfordLineRoutesData = null;
     </script>
     <script src="data/hartford-line-routes-data.js" onerror="console.log('Hartford Line routes data not yet generated')"></script>
+    
+    <!-- Include NJ Transit rail data (if available) -->
+    <script>
+        let njTransitRoutesData = null;
+    </script>
+    <script src="data/nj-transit-routes-data.js" onerror="console.log('NJ Transit routes data not yet generated')"></script>
+    
+    <!-- Include SEPTA rail data -->
+    <script src="data/septa-routes-data.js"></script>
 
     <!-- Tab switching functionality -->
     <!-- Note: switchTab function is now defined in app.js to access route loading functions -->

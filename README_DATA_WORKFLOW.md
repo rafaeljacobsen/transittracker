@@ -19,18 +19,26 @@ Run the download scripts to fetch the latest GTFS feeds:
 python download-mbta-gtfs.py
 
 # Download LIRR data (New York)
-python download-lirr-gtfs.py
+python scripts/download-lirr-gtfs.py
+
+# Download NJ Transit rail data
+python scripts/download-nj-transit-rail-gtfs.py
+
+# Download SEPTA data (Philadelphia)
+python scripts/download-septa-gtfs.py
 ```
 
 **What this does:**
 - Downloads the latest GTFS zip file
-- Extracts to `mbta_gtfs/` or `lirr_gtfs/` directory
+- Extracts to `mbta_gtfs/`, `lirr_gtfs/`, `nj_transit_gtfs/`, or `septa_gtfs/` directory
 - Creates backup of old data (if exists)
 - Saves zip archive for reference
 
 **Output directories:**
 - `mbta_gtfs/` - MBTA transit data
 - `lirr_gtfs/` - LIRR transit data
+- `nj_transit_gtfs/` - NJ Transit rail data
+- `septa_gtfs/` - SEPTA rail/metro data
 
 ---
 
@@ -49,7 +57,17 @@ python parse-silver-line-data.py # Silver Line BRT
 
 #### **MTA (New York) Parsers:**
 ```bash
-python parse-lirr-data.py        # LIRR routes & stations
+python scripts/parse-lirr-data.py        # LIRR routes & stations
+```
+
+#### **NJ Transit Parsers:**
+```bash
+python scripts/parse-nj-transit-rail-data.py   # NJ Transit rail routes & stations
+```
+
+#### **SEPTA (Philadelphia) Parsers:**
+```bash
+python scripts/parse-septa-rail-data.py   # SEPTA rail/metro routes & stations
 ```
 
 **What this does:**
@@ -63,6 +81,9 @@ python parse-lirr-data.py        # LIRR routes & stations
 - `mbta-*-data.json` - JSON format (for reference)
 - `lirr-*-data.js` - JavaScript format (used by website)
 - `lirr-*-data.json` - JSON format (for reference)
+- `nj-transit-routes-data.js` - NJ Transit rail (used by website)
+- `nj-transit-routes-data.json` - NJ Transit rail (for reference)
+- `septa-routes-data.js` - SEPTA rail/metro (used by website)
 
 ---
 
@@ -124,6 +145,8 @@ pip install pandas tqdm
 |----------------|------------------|----------------|
 | **MBTA** | Daily/Weekly | When routes/schedules change |
 | **MTA LIRR** | Weekly/Monthly | When routes/schedules change |
+| **NJ Transit** | As needed | When routes/schedules change |
+| **SEPTA** | As needed | When routes/schedules change |
 
 **Tip:** Run download scripts periodically to keep data current!
 
@@ -191,6 +214,8 @@ python download-mbta-gtfs.py  # or download-lirr-gtfs.py
 |--------|---------------|
 | **MBTA** | https://cdn.mbta.com/MBTA_GTFS.zip |
 | **MTA LIRR** | http://web.mta.info/developers/data/lirr/google_transit.zip |
+| **NJ Transit** | https://www.njtransit.com/rail_data.zip |
+| **SEPTA** | https://www3.septa.org/developer/gtfs_public.zip |
 
 ---
 
@@ -205,6 +230,12 @@ The parse scripts generate **static** route/station data.
 - Just check the "Live Trains" checkbox in the MTA tab!
 - See `LIRR_LIVE_TRAINS.md` for details
 
+### SEPTA Live Tracking ✅
+**Already working!** SEPTA Regional Rail live train tracking uses the public GTFS-RT feed:
+- **No API key needed** - feed is at `https://www3.septa.org/gtfsrt/septarail-pa-us/Vehicle/Vehicle.pb`
+- **Auto-updates every 5 seconds**
+- Check the "Live" checkbox in the SEPTA tab
+
 ### MBTA Live Tracking
 For **MBTA live train positions**:
 - MBTA V3 API: https://api-v3.mbta.com/
@@ -213,6 +244,6 @@ For **MBTA live train positions**:
 
 ---
 
-**Last Updated:** November 2025
+**Last Updated:** February 2026
 
 

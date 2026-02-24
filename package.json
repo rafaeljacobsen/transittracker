@@ -1,0 +1,9 @@
+{
+  "name": "transittracker",
+  "version": "1.0.0",
+  "description": "Transit tracker map with live NJ Transit (Vercel API)",
+  "private": true,
+  "dependencies": {
+    "form-data": "^4.0.0"
+  }
+}

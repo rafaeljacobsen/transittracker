@@ -1,65 +1,8 @@
 {
-  "Airport": {
-    "name": "Airport",
-    "lat": 42.374262,
-    "lon": -71.030395,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Blue Line",
-          "Providence/Stoughton Line"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "E",
-          "J",
-          "Z"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Hiawatha Service",
-          "Palmetto",
-          "Vermonter",
-          "Borealis",
-          "Acela",
-          "Crescent",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Aquarium": {
-    "name": "Aquarium",
-    "lat": 42.359784,
-    "lon": -71.051652,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Blue Line",
-          "Orange Line"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "F",
-          "FX",
-          "Q"
-        ]
-      }
-    ]
-  },
   "South Station": {
     "name": "South Station",
-    "lat": 42.35141,
-    "lon": -71.055417,
+    "lat": 42.351664571428564,
+    "lon": -71.05538028571429,
     "systems": [
       {
         "system": "MBTA",
@@ -67,11 +10,9 @@
           "CapeFLYER",
           "Fairmount Line",
           "Fall River/New Bedford Line",
-          "Fitchburg Line",
           "Foxboro Event Service",
           "Framingham/Worcester Line",
           "Franklin/Foxboro Line",
-          "Green Line B",
           "Greenbush Line",
           "Kingston Line",
           "Needham Line",
@@ -80,34 +21,8 @@
         ]
       },
       {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "Danbury",
-          "Harlem"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Montauk Branch",
-          "Greenport Service"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "N",
-          "R",
-          "W",
-          "1"
-        ]
-      },
-      {
         "system": "Amtrak",
         "routes": [
-          "Floridian",
-          "Cardinal",
           "Lake Shore Limited",
           "Acela",
           "Northeast Regional"
@@ -115,89 +30,23 @@
       }
     ]
   },
-  "Holbrook/Randolph": {
-    "name": "Holbrook/Randolph",
-    "lat": 42.156343,
-    "lon": -71.027371,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Fall River/New Bedford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter"
-        ]
-      }
-    ]
-  },
-  "Quincy Center": {
-    "name": "Quincy Center",
-    "lat": 42.251809,
-    "lon": -71.005409,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Fall River/New Bedford Line",
-          "Greenbush Line",
-          "Kingston Line",
-          "Red Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Carl Sandburg",
-          "Illinois Zephyr"
-        ]
-      }
-    ]
-  },
-  "Lincoln": {
-    "name": "Lincoln",
-    "lat": 42.414983,
-    "lon": -71.326462,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Fitchburg Line"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "1",
-          "2"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Texas Eagle",
-          "California Zephyr",
-          "Lincoln Service",
-          "Lincoln Service Missouri River Runner"
-        ]
-      }
-    ]
-  },
-  "North Leominster": {
-    "name": "North Leominster",
-    "lat": 42.539017,
-    "lon": -71.739186,
+  "North Station": {
+    "name": "North Station",
+    "lat": 42.36489386666666,
+    "lon": -71.06019339999999,
     "systems": [
       {
         "system": "MBTA",
         "routes": [
           "Fitchburg Line",
+          "Green Line B",
+          "Green Line C",
+          "Green Line D",
+          "Green Line E",
           "Haverhill Line",
           "Lowell Line",
-          "Newburyport/Rockport Line"
+          "Newburyport/Rockport Line",
+          "Orange Line"
         ]
       },
       {
@@ -208,49 +57,10 @@
       }
     ]
   },
-  "Shirley": {
-    "name": "Shirley",
-    "lat": 42.545089,
-    "lon": -71.648004,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Fitchburg Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Montauk Branch"
-        ]
-      }
-    ]
-  },
-  "Attleboro": {
-    "name": "Attleboro",
-    "lat": 41.941732,
-    "lon": -71.284214,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Foxboro Event Service",
-          "Providence/Stoughton Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter"
-        ]
-      }
-    ]
-  },
   "Back Bay": {
     "name": "Back Bay",
-    "lat": 42.347283,
-    "lon": -71.075312,
+    "lat": 42.347322812499996,
+    "lon": -71.0755678125,
     "systems": [
       {
         "system": "MBTA",
@@ -258,10 +68,6 @@
           "Foxboro Event Service",
           "Framingham/Worcester Line",
           "Franklin/Foxboro Line",
-          "Green Line B",
-          "Green Line C",
-          "Green Line D",
-          "Green Line E",
           "Needham Line",
           "Orange Line",
           "Providence/Stoughton Line"
@@ -279,8 +85,8 @@
   },
   "Providence": {
     "name": "Providence",
-    "lat": 41.829293,
-    "lon": -71.413301,
+    "lat": 41.8293915,
+    "lon": -71.4133895,
     "systems": [
       {
         "system": "MBTA",
@@ -298,55 +104,10 @@
       }
     ]
   },
-  "Ashland": {
-    "name": "Ashland",
-    "lat": 42.26149,
-    "lon": -71.482161,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Framingham/Worcester Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Cardinal",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Auburndale": {
-    "name": "Auburndale",
-    "lat": 42.345833,
-    "lon": -71.250373,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Framingham/Worcester Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Port Washington Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Capitol Corridor"
-        ]
-      }
-    ]
-  },
   "Framingham": {
     "name": "Framingham",
-    "lat": 42.276108,
-    "lon": -71.420055,
+    "lat": 42.2760505,
+    "lon": -71.420044,
     "systems": [
       {
         "system": "MBTA",
@@ -358,33 +119,14 @@
         "system": "Amtrak",
         "routes": [
           "Lake Shore Limited"
-        ]
-      }
-    ]
-  },
-  "Newtonville": {
-    "name": "Newtonville",
-    "lat": 42.351702,
-    "lon": -71.205408,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Framingham/Worcester Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Southwest Chief"
         ]
       }
     ]
   },
   "Worcester": {
     "name": "Worcester",
-    "lat": 42.261835,
-    "lon": -71.791806,
+    "lat": 42.2616565,
+    "lon": -71.793309,
     "systems": [
       {
         "system": "MBTA",
@@ -400,276 +142,10 @@
       }
     ]
   },
-  "Forest Hills": {
-    "name": "Forest Hills",
-    "lat": 42.301065,
-    "lon": -71.113491,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Franklin/Foxboro Line",
-          "Needham Line",
-          "Orange Line",
-          "Providence/Stoughton Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch",
-          "Hempstead Branch",
-          "Ronkonkoma Branch",
-          "Long Beach Branch",
-          "Far Rockaway Branch",
-          "West Hempstead Branch",
-          "Port Jefferson Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "E",
-          "F",
-          "FX",
-          "M",
-          "R"
-        ]
-      }
-    ]
-  },
-  "Franklin": {
-    "name": "Franklin",
-    "lat": 42.083071,
-    "lon": -71.396375,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Franklin/Foxboro Line"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "C",
-          "1",
-          "2",
-          "3",
-          "4",
-          "5"
-        ]
-      }
-    ]
-  },
-  "Hyde Park": {
-    "name": "Hyde Park",
-    "lat": 42.25503,
-    "lon": -71.125526,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Franklin/Foxboro Line",
-          "Providence/Stoughton Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Ronkonkoma Branch",
-          "Port Jefferson Branch"
-        ]
-      }
-    ]
-  },
-  "Norfolk": {
-    "name": "Norfolk",
-    "lat": 42.120694,
-    "lon": -71.325217,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Franklin/Foxboro Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Windsor Gardens": {
-    "name": "Windsor Gardens",
-    "lat": 42.172127,
-    "lon": -71.219366,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Franklin/Foxboro Line"
-        ]
-      },
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Gilman Square": {
-    "name": "Gilman Square",
-    "lat": 42.387831,
-    "lon": -71.096629,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Green Line B",
-          "Green Line C",
-          "Green Line E"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Saluki",
-          "Illini"
-        ]
-      }
-    ]
-  },
-  "Medford/Tufts": {
-    "name": "Medford/Tufts",
-    "lat": 42.40828,
-    "lon": -71.117339,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Green Line B",
-          "Green Line C",
-          "Green Line E"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Greenport Service"
-        ]
-      }
-    ]
-  },
-  "Washington Square": {
-    "name": "Washington Square",
-    "lat": 42.339471,
-    "lon": -71.135139,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Green Line C"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Floridian",
-          "Cardinal",
-          "Palmetto",
-          "Vermonter",
-          "Carolinian",
-          "Acela",
-          "Silver Meteor",
-          "Missouri River Runner",
-          "Lincoln Service Missouri River Runner",
-          "Crescent",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Riverside": {
-    "name": "Riverside",
-    "lat": 42.337317,
-    "lon": -71.252256,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Green Line D"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Southwest Chief"
-        ]
-      }
-    ]
-  },
-  "Andover": {
-    "name": "Andover",
-    "lat": 42.658336,
-    "lon": -71.144502,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Haverhill Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Downeaster"
-        ]
-      }
-    ]
-  },
-  "Greenwood": {
-    "name": "Greenwood",
-    "lat": 42.483005,
-    "lon": -71.067247,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Haverhill Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "City of New Orleans"
-        ]
-      }
-    ]
-  },
   "Haverhill": {
     "name": "Haverhill",
-    "lat": 42.773474,
-    "lon": -71.086237,
+    "lat": 42.7733855,
+    "lon": -71.08630600000001,
     "systems": [
       {
         "system": "MBTA",
@@ -681,147 +157,14 @@
         "system": "Amtrak",
         "routes": [
           "Downeaster"
-        ]
-      }
-    ]
-  },
-  "Lawrence": {
-    "name": "Lawrence",
-    "lat": 42.701806,
-    "lon": -71.15198,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Haverhill Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Far Rockaway Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "6"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Southwest Chief"
-        ]
-      }
-    ]
-  },
-  "Melrose Highlands": {
-    "name": "Melrose Highlands",
-    "lat": 42.469464,
-    "lon": -71.068297,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Haverhill Line"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "Harlem"
-        ]
-      }
-    ]
-  },
-  "North Wilmington": {
-    "name": "North Wilmington",
-    "lat": 42.571073,
-    "lon": -71.160939,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Haverhill Line",
-          "Lowell Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Amtrak Thruway Connecting Service",
-          "Cardinal",
-          "Palmetto",
-          "Vermonter",
-          "Carolinian",
-          "Acela",
-          "Silver Meteor",
-          "Crescent",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Wakefield": {
-    "name": "Wakefield",
-    "lat": 42.502126,
-    "lon": -71.075566,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Haverhill Line"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "Harlem"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "2"
-        ]
-      }
-    ]
-  },
-  "Kingston": {
-    "name": "Kingston",
-    "lat": 41.97762,
-    "lon": -70.721709,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Kingston Line"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "C",
-          "2",
-          "3",
-          "4",
-          "5"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Northeast Regional"
         ]
       }
     ]
   },
   "Anderson/Woburn": {
     "name": "Anderson/Woburn",
-    "lat": 42.516987,
-    "lon": -71.144475,
+    "lat": 42.5171725,
+    "lon": -71.144149,
     "systems": [
       {
         "system": "MBTA",
@@ -837,108 +180,10 @@
       }
     ]
   },
-  "Central Avenue": {
-    "name": "Central Avenue",
-    "lat": 42.270001,
-    "lon": -71.073358,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Mattapan Trolley"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "M"
-        ]
-      }
-    ]
-  },
-  "Beverly": {
-    "name": "Beverly",
-    "lat": 42.547276,
-    "lon": -70.885432,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Newburyport/Rockport Line"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "2",
-          "5"
-        ]
-      }
-    ]
-  },
-  "Salem": {
-    "name": "Salem",
-    "lat": 42.524792,
-    "lon": -70.895876,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Newburyport/Rockport Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Amtrak Cascades",
-          "Coast Starlight"
-        ]
-      }
-    ]
-  },
-  "Jackson Square": {
-    "name": "Jackson Square",
-    "lat": 42.323132,
-    "lon": -71.099592,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Orange Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Wolverine",
-          "City of New Orleans"
-        ]
-      }
-    ]
-  },
-  "Stony Brook": {
-    "name": "Stony Brook",
-    "lat": 42.317062,
-    "lon": -71.104248,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Orange Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Port Jefferson Branch"
-        ]
-      }
-    ]
-  },
   "Route 128": {
     "name": "Route 128",
-    "lat": 42.210308,
-    "lon": -71.147134,
+    "lat": 42.210263999999995,
+    "lon": -71.14764066666667,
     "systems": [
       {
         "system": "MBTA",
@@ -955,477 +200,29 @@
       }
     ]
   },
-  "Broadway": {
-    "name": "Broadway",
-    "lat": 42.342622,
-    "lon": -71.056967,
+  "Penn Station": {
+    "name": "Penn Station",
+    "lat": 40.75051474054056,
+    "lon": -73.99351939999998,
     "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Red Line"
-        ]
-      },
-      {
-        "system": "LIRR",
-        "routes": [
-          "Port Washington Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "C",
-          "B",
-          "D",
-          "F",
-          "FX",
-          "M",
-          "G",
-          "J",
-          "Z",
-          "L",
-          "N",
-          "W",
-          "7",
-          "7X"
-        ]
-      }
-    ]
-  },
-  "Davis": {
-    "name": "Davis",
-    "lat": 42.39674,
-    "lon": -71.121815,
-    "systems": [
-      {
-        "system": "MBTA",
-        "routes": [
-          "Red Line"
-        ]
-      },
       {
         "system": "Amtrak",
         "routes": [
-          "Capitol Corridor",
-          "California Zephyr",
-          "Coast Starlight"
-        ]
-      }
-    ]
-  },
-  "SPRINGFIELD": {
-    "name": "SPRINGFIELD",
-    "lat": 42.106137,
-    "lon": -72.593041,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Texas Eagle",
+          "Maple Leaf",
+          "Cardinal",
+          "Pennsylvanian",
+          "Palmetto",
           "Vermonter",
+          "Adirondack",
           "Lake Shore Limited",
-          "Valley Flyer",
-          "Lincoln Service",
-          "Amtrak Hartford Line",
-          "Lincoln Service Missouri River Runner",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "WINDSOR LOCKS": {
-    "name": "WINDSOR LOCKS",
-    "lat": 41.913938,
-    "lon": -72.625967,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "WALLINGFORD": {
-    "name": "WALLINGFORD",
-    "lat": 41.461695,
-    "lon": -72.82273,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "STATE STREET STATION": {
-    "name": "STATE STREET STATION",
-    "lat": 41.305092,
-    "lon": -72.921692,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "MERIDEN": {
-    "name": "MERIDEN",
-    "lat": 41.538894,
-    "lon": -72.801485,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "HARTFORD": {
-    "name": "HARTFORD",
-    "lat": 41.76896,
-    "lon": -72.681831,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "NEW HAVEN UNION STATION": {
-    "name": "NEW HAVEN UNION STATION",
-    "lat": 41.297172,
-    "lon": -72.925945,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
+          "Carolinian",
+          "Keystone Service",
+          "Empire Service",
           "Acela",
-          "Valley Flyer",
-          "Amtrak Hartford Line",
+          "Silver Meteor",
+          "Ethan Allen Express",
+          "Crescent",
           "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "BERLIN": {
-    "name": "BERLIN",
-    "lat": 41.636136,
-    "lon": -72.765192,
-    "systems": [
-      {
-        "system": "CTrail Hartford Line",
-        "routes": [
-          "Hartford Line"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
-          "Valley Flyer",
-          "Amtrak Hartford Line",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Stamford Amtrak Station": {
-    "name": "Stamford Amtrak Station",
-    "lat": 41.04713,
-    "lon": -73.54216,
-    "systems": [
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan",
-          "Danbury"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
-          "Acela",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Bridgeport Amtrak Station": {
-    "name": "Bridgeport Amtrak Station",
-    "lat": 41.178006,
-    "lon": -73.187539,
-    "systems": [
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "Waterbury"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Clinton": {
-    "name": "Clinton",
-    "lat": 41.279458,
-    "lon": -72.528314,
-    "systems": [
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "C",
-          "G"
-        ]
-      }
-    ]
-  },
-  "New London": {
-    "name": "New London",
-    "lat": 41.354267,
-    "lon": -72.093225,
-    "systems": [
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Madison": {
-    "name": "Madison",
-    "lat": 41.283577,
-    "lon": -72.599444,
-    "systems": [
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Southwest Chief"
-        ]
-      }
-    ]
-  },
-  "Old Saybrook Amtrak Station": {
-    "name": "Old Saybrook Amtrak Station",
-    "lat": 41.30039,
-    "lon": -72.376818,
-    "systems": [
-      {
-        "system": "CTrail Shore Line East",
-        "routes": [
-          "Commuter Rail"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Fairfield": {
-    "name": "Fairfield",
-    "lat": 41.143077,
-    "lon": -73.257742,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Capitol Corridor"
-        ]
-      }
-    ]
-  },
-  "Fordham": {
-    "name": "Fordham",
-    "lat": 40.8615,
-    "lon": -73.89058,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan",
-          "Harlem"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "B",
-          "D",
-          "4"
-        ]
-      }
-    ]
-  },
-  "Westport": {
-    "name": "Westport",
-    "lat": 41.118928,
-    "lon": -73.371413,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Adirondack"
-        ]
-      }
-    ]
-  },
-  "Grand Central": {
-    "name": "Grand Central",
-    "lat": 40.752998,
-    "lon": -73.977056,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan",
-          "Danbury",
-          "Hudson",
-          "Harlem"
         ]
       },
       {
@@ -1433,7 +230,9 @@
         "routes": [
           "Babylon Branch",
           "Hempstead Branch",
+          "Oyster Bay Branch",
           "Ronkonkoma Branch",
+          "Montauk Branch",
           "Long Beach Branch",
           "Far Rockaway Branch",
           "West Hempstead Branch",
@@ -1444,253 +243,32 @@
       {
         "system": "MTA Subway",
         "routes": [
-          "4",
-          "5",
-          "6",
-          "6X",
-          "7",
-          "7X"
-        ]
-      }
-    ]
-  },
-  "Harlem-125 St": {
-    "name": "Harlem-125 St",
-    "lat": 40.805157,
-    "lon": -73.939149,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan",
-          "Danbury",
-          "Hudson",
-          "Harlem"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
           "A",
           "C",
-          "B",
-          "D",
-          "N",
-          "R",
-          "W",
+          "E",
           "1",
           "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "6X"
-        ]
-      }
-    ]
-  },
-  "New Rochelle": {
-    "name": "New Rochelle",
-    "lat": 40.911605,
-    "lon": -73.783807,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan"
+          "3"
         ]
       },
       {
-        "system": "Amtrak",
+        "system": "NJ Transit",
         "routes": [
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Pelham": {
-    "name": "Pelham",
-    "lat": 40.910321,
-    "lon": -73.810242,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "New Haven",
-          "New Canaan"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "2",
-          "5",
-          "6",
-          "6X"
-        ]
-      }
-    ]
-  },
-  "Redding": {
-    "name": "Redding",
-    "lat": 41.325684,
-    "lon": -73.4338,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Danbury"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Coast Starlight"
-        ]
-      }
-    ]
-  },
-  "Waterbury": {
-    "name": "Waterbury",
-    "lat": 41.552728,
-    "lon": -73.046126,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Waterbury"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter"
-        ]
-      }
-    ]
-  },
-  "Hastings-on-Hudson": {
-    "name": "Hastings-on-Hudson",
-    "lat": 40.994109,
-    "lon": -73.884512,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Hudson"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Maple Leaf",
-          "Adirondack",
-          "California Zephyr",
-          "Empire Service",
-          "Ethan Allen Express"
-        ]
-      }
-    ]
-  },
-  "Poughkeepsie": {
-    "name": "Poughkeepsie",
-    "lat": 41.705839,
-    "lon": -73.937946,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Hudson"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Maple Leaf",
-          "Adirondack",
-          "Lake Shore Limited",
-          "Empire Service",
-          "Ethan Allen Express"
-        ]
-      }
-    ]
-  },
-  "Yonkers": {
-    "name": "Yonkers",
-    "lat": 40.935795,
-    "lon": -73.902668,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Hudson"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Maple Leaf",
-          "Adirondack",
-          "Empire Service",
-          "Ethan Allen Express"
-        ]
-      }
-    ]
-  },
-  "Marble Hill": {
-    "name": "Marble Hill",
-    "lat": 40.874333,
-    "lon": -73.910941,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Hudson"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "1"
-        ]
-      }
-    ]
-  },
-  "Cortlandt": {
-    "name": "Cortlandt",
-    "lat": 41.246259,
-    "lon": -73.921884,
-    "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Hudson"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "N",
-          "R",
-          "W",
-          "1"
+          "Montclair-Boonton Line",
+          "Morris & Essex Line",
+          "Gladstone Branch",
+          "Northeast Corridor",
+          "North Jersey Coast Line",
+          "Raritan Valley Line"
         ]
       }
     ]
   },
   "Croton-Harmon": {
     "name": "Croton-Harmon",
-    "lat": 41.189903,
-    "lon": -73.882394,
+    "lat": 41.18990300000001,
+    "lon": -73.88239399999999,
     "systems": [
-      {
-        "system": "Metro North",
-        "routes": [
-          "Hudson"
-        ]
-      },
       {
         "system": "Amtrak",
         "routes": [
@@ -1700,138 +278,715 @@
           "Empire Service",
           "Ethan Allen Express"
         ]
-      }
-    ]
-  },
-  "Glenwood": {
-    "name": "Glenwood",
-    "lat": 40.950496,
-    "lon": -73.899062,
-    "systems": [
+      },
       {
         "system": "Metro North",
         "routes": [
           "Hudson"
         ]
-      },
+      }
+    ]
+  },
+  "Poughkeepsie": {
+    "name": "Poughkeepsie",
+    "lat": 41.70685316666667,
+    "lon": -73.937566,
+    "systems": [
       {
         "system": "Amtrak",
         "routes": [
-          "California Zephyr"
+          "Maple Leaf",
+          "Adirondack",
+          "Lake Shore Limited",
+          "Empire Service",
+          "Ethan Allen Express"
         ]
-      }
-    ]
-  },
-  "Yankees-E 153 St": {
-    "name": "Yankees-E 153 St",
-    "lat": 40.8253,
-    "lon": -73.9299,
-    "systems": [
+      },
       {
         "system": "Metro North",
         "routes": [
           "Hudson"
         ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "B",
-          "D",
-          "N",
-          "R",
-          "W",
-          "4"
-        ]
       }
     ]
   },
-  "Cold Spring": {
-    "name": "Cold Spring",
-    "lat": 41.415283,
-    "lon": -73.95809,
+  "Yonkers": {
+    "name": "Yonkers",
+    "lat": 40.9356278,
+    "lon": -73.902344,
     "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Maple Leaf",
+          "Adirondack",
+          "Empire Service",
+          "Ethan Allen Express"
+        ]
+      },
       {
         "system": "Metro North",
         "routes": [
           "Hudson"
         ]
+      }
+    ]
+  },
+  "Wilmington": {
+    "name": "Wilmington",
+    "lat": 39.73726266666666,
+    "lon": -75.55109444444446,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Cardinal",
+          "Palmetto",
+          "Vermonter",
+          "Carolinian",
+          "Acela",
+          "Silver Meteor",
+          "Crescent",
+          "Northeast Regional"
+        ]
       },
       {
-        "system": "LIRR",
+        "system": "SEPTA",
         "routes": [
-          "Port Jefferson Branch"
+          "Wilmington/Newark Line"
         ]
       }
     ]
   },
-  "Williams Bridge": {
-    "name": "Williams Bridge",
-    "lat": 40.878569,
-    "lon": -73.871064,
+  "NEWARK PENN STATION": {
+    "name": "NEWARK PENN STATION",
+    "lat": 40.734622866666676,
+    "lon": -74.16455786666667,
     "systems": [
       {
-        "system": "Metro North",
+        "system": "Amtrak",
         "routes": [
-          "Harlem"
+          "Cardinal",
+          "Pennsylvanian",
+          "Palmetto",
+          "Vermonter",
+          "Carolinian",
+          "Keystone Service",
+          "Acela",
+          "Silver Meteor",
+          "Crescent",
+          "Northeast Regional"
         ]
       },
       {
-        "system": "MTA Subway",
+        "system": "NJ Transit",
         "routes": [
-          "2",
-          "5"
+          "Northeast Corridor",
+          "North Jersey Coast Line",
+          "Newark Light Rail",
+          "Raritan Valley Line"
         ]
       }
     ]
   },
-  "Tremont": {
-    "name": "Tremont",
-    "lat": 40.847301,
-    "lon": -73.89955,
+  "Philadelphia 30th St": {
+    "name": "Philadelphia 30th St",
+    "lat": 39.95622604166669,
+    "lon": -75.18142987499998,
     "systems": [
       {
-        "system": "Metro North",
+        "system": "Amtrak",
         "routes": [
-          "Harlem"
+          "Cardinal",
+          "Pennsylvanian",
+          "Palmetto",
+          "Vermonter",
+          "Carolinian",
+          "Keystone Service",
+          "Acela",
+          "Silver Meteor",
+          "Crescent",
+          "Northeast Regional"
         ]
       },
       {
-        "system": "MTA Subway",
+        "system": "NJ Transit",
         "routes": [
-          "B",
-          "D",
-          "2",
-          "5",
-          "6",
-          "6X"
+          "Atlantic City Rail Line"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Airport Line",
+          "Warminster Line",
+          "Wilmington/Newark Line",
+          "Media/Wawa Line",
+          "West Trenton Line",
+          "Lansdale/Doylestown Line",
+          "Paoli/Thorndale Line",
+          "Cynwyd Line",
+          "Manayunk/Norristown Line",
+          "Chestnut Hill East Line",
+          "Trenton Line",
+          "Chestnut Hill West Line",
+          "Fox Chase Line"
         ]
       }
     ]
   },
-  "Woodlawn": {
-    "name": "Woodlawn",
-    "lat": 40.895361,
-    "lon": -73.862916,
+  "Trenton": {
+    "name": "Trenton",
+    "lat": 40.21887266666666,
+    "lon": -74.7544175,
     "systems": [
       {
-        "system": "Metro North",
+        "system": "Amtrak",
         "routes": [
-          "Harlem"
+          "Cardinal",
+          "Pennsylvanian",
+          "Palmetto",
+          "Vermonter",
+          "Carolinian",
+          "Keystone Service",
+          "Silver Meteor",
+          "Crescent",
+          "Northeast Regional"
         ]
       },
       {
-        "system": "MTA Subway",
+        "system": "NJ Transit",
         "routes": [
-          "4"
+          "Northeast Corridor",
+          "Riverline Light Rail"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Trenton Line"
+        ]
+      }
+    ]
+  },
+  "Exton": {
+    "name": "Exton",
+    "lat": 40.01929066666667,
+    "lon": -75.621712,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Pennsylvanian",
+          "Keystone Service"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Paoli/Thorndale Line"
+        ]
+      }
+    ]
+  },
+  "Paoli": {
+    "name": "Paoli",
+    "lat": 40.042756000000004,
+    "lon": -75.48376,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Pennsylvanian",
+          "Keystone Service"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Paoli/Thorndale Line"
+        ]
+      }
+    ]
+  },
+  "METROPARK": {
+    "name": "METROPARK",
+    "lat": 40.568139428571435,
+    "lon": -74.32955600000001,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Palmetto",
+          "Vermonter",
+          "Keystone Service",
+          "Acela",
+          "Crescent",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "NJ Transit",
+        "routes": [
+          "Northeast Corridor"
+        ]
+      }
+    ]
+  },
+  "SPRINGFIELD": {
+    "name": "SPRINGFIELD",
+    "lat": 42.106012,
+    "lon": -72.59292766666665,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Lake Shore Limited",
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      }
+    ]
+  },
+  "Bridgeport": {
+    "name": "Bridgeport",
+    "lat": 41.1782744,
+    "lon": -73.1873538,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Shore Line East",
+        "routes": [
+          "Commuter Rail"
+        ]
+      },
+      {
+        "system": "Metro North",
+        "routes": [
+          "New Haven",
+          "Waterbury"
+        ]
+      }
+    ]
+  },
+  "New Haven Union Station": {
+    "name": "New Haven Union Station",
+    "lat": 41.29749462499999,
+    "lon": -72.926781875,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Acela",
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      },
+      {
+        "system": "CTrail Shore Line East",
+        "routes": [
+          "Commuter Rail"
+        ]
+      },
+      {
+        "system": "Metro North",
+        "routes": [
+          "New Haven"
+        ]
+      }
+    ]
+  },
+  "Stamford": {
+    "name": "Stamford",
+    "lat": 41.04690757142857,
+    "lon": -73.542454,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Acela",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Shore Line East",
+        "routes": [
+          "Commuter Rail"
+        ]
+      },
+      {
+        "system": "Metro North",
+        "routes": [
+          "New Haven",
+          "New Canaan",
+          "Danbury"
+        ]
+      }
+    ]
+  },
+  "HARTFORD": {
+    "name": "HARTFORD",
+    "lat": 41.768800799999994,
+    "lon": -72.6814174,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      }
+    ]
+  },
+  "WINDSOR LOCKS": {
+    "name": "WINDSOR LOCKS",
+    "lat": 41.9139524,
+    "lon": -72.6260742,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      }
+    ]
+  },
+  "MERIDEN": {
+    "name": "MERIDEN",
+    "lat": 41.5392868,
+    "lon": -72.8008394,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Vermonter",
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      }
+    ]
+  },
+  "North Philadelphia Amtrak": {
+    "name": "North Philadelphia Amtrak",
+    "lat": 39.99711333333334,
+    "lon": -75.15553799999999,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Keystone Service"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Trenton Line",
+          "Chestnut Hill West Line"
+        ]
+      }
+    ]
+  },
+  "PRINCETON JCT.": {
+    "name": "PRINCETON JCT.",
+    "lat": 40.316083,
+    "lon": -74.6238645,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Keystone Service",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "NJ Transit",
+        "routes": [
+          "Northeast Corridor",
+          "Princeton Shuttle"
+        ]
+      }
+    ]
+  },
+  "Downingtown": {
+    "name": "Downingtown",
+    "lat": 40.002191499999995,
+    "lon": -75.7107775,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Keystone Service"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Paoli/Thorndale Line"
+        ]
+      }
+    ]
+  },
+  "NEW BRUNSWICK": {
+    "name": "NEW BRUNSWICK",
+    "lat": 40.496773999999995,
+    "lon": -74.44609366666667,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Keystone Service",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "NJ Transit",
+        "routes": [
+          "Northeast Corridor"
+        ]
+      }
+    ]
+  },
+  "Cornwells Heights": {
+    "name": "Cornwells Heights",
+    "lat": 40.0712815,
+    "lon": -74.95325349999999,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Keystone Service"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Trenton Line"
+        ]
+      }
+    ]
+  },
+  "Ardmore": {
+    "name": "Ardmore",
+    "lat": 40.008279,
+    "lon": -75.2903995,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Keystone Service"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Paoli/Thorndale Line"
+        ]
+      }
+    ]
+  },
+  "New Haven State Street": {
+    "name": "New Haven State Street",
+    "lat": 41.3051805,
+    "lon": -72.92196383333332,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      },
+      {
+        "system": "CTrail Shore Line East",
+        "routes": [
+          "Commuter Rail"
+        ]
+      },
+      {
+        "system": "Metro North",
+        "routes": [
+          "New Haven"
+        ]
+      }
+    ]
+  },
+  "WINDSOR": {
+    "name": "WINDSOR",
+    "lat": 41.85202425,
+    "lon": -72.6422245,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      }
+    ]
+  },
+  "BERLIN": {
+    "name": "BERLIN",
+    "lat": 41.63573025,
+    "lon": -72.7652535,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Valley Flyer",
+          "Amtrak Hartford Line",
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Hartford Line",
+        "routes": [
+          "Hartford Line"
+        ]
+      }
+    ]
+  },
+  "Old Saybrook Amtrak Station": {
+    "name": "Old Saybrook Amtrak Station",
+    "lat": 41.30039,
+    "lon": -72.376818,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Shore Line East",
+        "routes": [
+          "Commuter Rail"
+        ]
+      }
+    ]
+  },
+  "New Rochelle": {
+    "name": "New Rochelle",
+    "lat": 40.91155366666667,
+    "lon": -73.783981,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "Metro North",
+        "routes": [
+          "New Haven",
+          "New Canaan"
+        ]
+      }
+    ]
+  },
+  "New London": {
+    "name": "New London",
+    "lat": 41.354267,
+    "lon": -72.093225,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "CTrail Shore Line East",
+        "routes": [
+          "Commuter Rail"
+        ]
+      }
+    ]
+  },
+  "Newark DE": {
+    "name": "Newark DE",
+    "lat": 39.669688,
+    "lon": -75.7535115,
+    "systems": [
+      {
+        "system": "Amtrak",
+        "routes": [
+          "Northeast Regional"
+        ]
+      },
+      {
+        "system": "SEPTA",
+        "routes": [
+          "Wilmington/Newark Line"
         ]
       }
     ]
   },
   "Woodside": {
     "name": "Woodside",
-    "lat": 40.74585067,
-    "lon": -73.90297516,
+    "lat": 40.745806536,
+    "lon": -73.902976928,
     "systems": [
       {
         "system": "LIRR",
@@ -1857,8 +1012,8 @@
   },
   "Nostrand Avenue": {
     "name": "Nostrand Avenue",
-    "lat": 40.67838785,
-    "lon": -73.94822108,
+    "lat": 40.6789003875,
+    "lon": -73.94877231,
     "systems": [
       {
         "system": "LIRR",
@@ -1875,19 +1030,15 @@
         "system": "MTA Subway",
         "routes": [
           "A",
-          "C",
-          "2",
-          "3",
-          "4",
-          "5"
+          "C"
         ]
       }
     ]
   },
   "Atlantic Terminal": {
     "name": "Atlantic Terminal",
-    "lat": 40.68359596,
-    "lon": -73.97567112,
+    "lat": 40.68389363058823,
+    "lon": -73.97702246117646,
     "systems": [
       {
         "system": "LIRR",
@@ -1904,11 +1055,8 @@
       {
         "system": "MTA Subway",
         "routes": [
-          "A",
-          "C",
           "B",
           "D",
-          "G",
           "N",
           "Q",
           "R",
@@ -1921,89 +1069,10 @@
       }
     ]
   },
-  "Laurelton": {
-    "name": "Laurelton",
-    "lat": 40.66848304,
-    "lon": -73.75174687,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch",
-          "Long Beach Branch",
-          "Far Rockaway Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Crescent"
-        ]
-      }
-    ]
-  },
-  "Rockville Centre": {
-    "name": "Rockville Centre",
-    "lat": 40.65831811,
-    "lon": -73.64654935,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Floridian"
-        ]
-      }
-    ]
-  },
-  "Freeport": {
-    "name": "Freeport",
-    "lat": 40.65745799,
-    "lon": -73.58232401,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Downeaster"
-        ]
-      }
-    ]
-  },
-  "St. Albans": {
-    "name": "St. Albans",
-    "lat": 40.69118348,
-    "lon": -73.76550937,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch",
-          "West Hempstead Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Vermonter"
-        ]
-      }
-    ]
-  },
-  "Kew Gardens": {
-    "name": "Kew Gardens",
-    "lat": 40.70964917,
-    "lon": -73.83088807,
+  "Grand Central": {
+    "name": "Grand Central",
+    "lat": 40.75348694736841,
+    "lon": -73.97623126315789,
     "systems": [
       {
         "system": "LIRR",
@@ -2011,112 +1080,6 @@
           "Babylon Branch",
           "Hempstead Branch",
           "Ronkonkoma Branch",
-          "Long Beach Branch",
-          "Far Rockaway Branch",
-          "West Hempstead Branch",
-          "Port Jefferson Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "E",
-          "F",
-          "FX"
-        ]
-      }
-    ]
-  },
-  "Jamaica": {
-    "name": "Jamaica",
-    "lat": 40.69960817,
-    "lon": -73.80852987,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch",
-          "Hempstead Branch",
-          "Oyster Bay Branch",
-          "Ronkonkoma Branch",
-          "Montauk Branch",
-          "Long Beach Branch",
-          "Far Rockaway Branch",
-          "West Hempstead Branch",
-          "Port Jefferson Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "E",
-          "F",
-          "FX",
-          "J",
-          "Z"
-        ]
-      }
-    ]
-  },
-  "East New York": {
-    "name": "East New York",
-    "lat": 40.67581191,
-    "lon": -73.90280882,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch",
-          "Hempstead Branch",
-          "Long Beach Branch",
-          "Far Rockaway Branch",
-          "West Hempstead Branch",
-          "Port Jefferson Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "J",
-          "Z",
-          "L"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Maple Leaf",
-          "Cardinal",
-          "Pennsylvanian",
-          "Palmetto",
-          "Vermonter",
-          "Adirondack",
-          "Lake Shore Limited",
-          "Carolinian",
-          "Keystone Service",
-          "Empire Service",
-          "Acela",
-          "Silver Meteor",
-          "Ethan Allen Express",
-          "Crescent",
-          "Northeast Regional"
-        ]
-      }
-    ]
-  },
-  "Penn Station": {
-    "name": "Penn Station",
-    "lat": 40.75058844,
-    "lon": -73.99358408,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Babylon Branch",
-          "Hempstead Branch",
-          "Oyster Bay Branch",
-          "Ronkonkoma Branch",
-          "Montauk Branch",
           "Long Beach Branch",
           "Far Rockaway Branch",
           "West Hempstead Branch",
@@ -2125,96 +1088,114 @@
         ]
       },
       {
+        "system": "Metro North",
+        "routes": [
+          "New Haven",
+          "New Canaan",
+          "Danbury",
+          "Hudson",
+          "Harlem"
+        ]
+      },
+      {
         "system": "MTA Subway",
         "routes": [
-          "A",
-          "C",
-          "E",
-          "B",
-          "D",
-          "F",
-          "FX",
-          "M",
-          "N",
-          "Q",
-          "R",
-          "W",
-          "1",
-          "2",
-          "3",
           "4",
-          "5"
-        ]
-      }
-    ]
-  },
-  "Garden City": {
-    "name": "Garden City",
-    "lat": 40.72310156,
-    "lon": -73.64036107,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Hempstead Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Southwest Chief"
-        ]
-      }
-    ]
-  },
-  "Long Island City": {
-    "name": "Long Island City",
-    "lat": 40.74134343,
-    "lon": -73.95763922,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Oyster Bay Branch",
-          "Montauk Branch",
-          "Port Jefferson Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
+          "5",
+          "6",
+          "6X",
           "7",
           "7X"
         ]
       }
     ]
   },
-  "Mineola": {
-    "name": "Mineola",
-    "lat": 40.74034743,
-    "lon": -73.64086293,
+  "Forest Hills": {
+    "name": "Forest Hills",
+    "lat": 40.72045699333334,
+    "lon": -73.84469192833332,
     "systems": [
       {
         "system": "LIRR",
         "routes": [
-          "Oyster Bay Branch",
+          "Babylon Branch",
+          "Hempstead Branch",
           "Ronkonkoma Branch",
-          "Montauk Branch",
+          "Long Beach Branch",
+          "Far Rockaway Branch",
+          "West Hempstead Branch",
           "Port Jefferson Branch"
         ]
       },
       {
-        "system": "Amtrak",
+        "system": "MTA Subway",
         "routes": [
-          "Texas Eagle"
+          "E",
+          "F",
+          "FX",
+          "M",
+          "R"
+        ]
+      }
+    ]
+  },
+  "Jamaica": {
+    "name": "Jamaica",
+    "lat": 40.6998276275,
+    "lon": -73.8083896525,
+    "systems": [
+      {
+        "system": "LIRR",
+        "routes": [
+          "Babylon Branch",
+          "Hempstead Branch",
+          "Oyster Bay Branch",
+          "Ronkonkoma Branch",
+          "Montauk Branch",
+          "Long Beach Branch",
+          "Far Rockaway Branch",
+          "West Hempstead Branch",
+          "Port Jefferson Branch"
+        ]
+      },
+      {
+        "system": "MTA Subway",
+        "routes": [
+          "E",
+          "J",
+          "Z"
+        ]
+      }
+    ]
+  },
+  "East New York": {
+    "name": "East New York",
+    "lat": 40.67574520857143,
+    "lon": -73.90284998857143,
+    "systems": [
+      {
+        "system": "LIRR",
+        "routes": [
+          "Babylon Branch",
+          "Hempstead Branch",
+          "Long Beach Branch",
+          "Far Rockaway Branch",
+          "West Hempstead Branch",
+          "Port Jefferson Branch"
+        ]
+      },
+      {
+        "system": "MTA Subway",
+        "routes": [
+          "L"
         ]
       }
     ]
   },
   "Hunterspoint Avenue": {
     "name": "Hunterspoint Avenue",
-    "lat": 40.74239046,
-    "lon": -73.94678997,
+    "lat": 40.74261139666667,
+    "lon": -73.94798765166666,
     "systems": [
       {
         "system": "LIRR",
@@ -2234,105 +1215,10 @@
       }
     ]
   },
-  "East Williston": {
-    "name": "East Williston",
-    "lat": 40.7560191,
-    "lon": -73.63940764,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Oyster Bay Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Empire Builder"
-        ]
-      }
-    ]
-  },
-  "Oceanside": {
-    "name": "Oceanside",
-    "lat": 40.63472102,
-    "lon": -73.65466582,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Long Beach Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Pacific Surfliner"
-        ]
-      }
-    ]
-  },
-  "Far Rockaway": {
-    "name": "Far Rockaway",
-    "lat": 40.60914311,
-    "lon": -73.75054135,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Far Rockaway Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A"
-        ]
-      }
-    ]
-  },
-  "Inwood": {
-    "name": "Inwood",
-    "lat": 40.61228773,
-    "lon": -73.74418354,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "Far Rockaway Branch"
-        ]
-      },
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A"
-        ]
-      }
-    ]
-  },
-  "Malverne": {
-    "name": "Malverne",
-    "lat": 40.67547844,
-    "lon": -73.66886364,
-    "systems": [
-      {
-        "system": "LIRR",
-        "routes": [
-          "West Hempstead Branch"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Texas Eagle"
-        ]
-      }
-    ]
-  },
   "Flushing Main Street": {
     "name": "Flushing Main Street",
-    "lat": 40.75789494,
-    "lon": -73.83134684,
+    "lat": 40.75903164666667,
+    "lon": -73.83046894666667,
     "systems": [
       {
         "system": "LIRR",
@@ -2351,8 +1237,8 @@
   },
   "Mets-Willets Point": {
     "name": "Mets-Willets Point",
-    "lat": 40.75239835,
-    "lon": -73.84370059,
+    "lat": 40.75388078333334,
+    "lon": -73.84498353,
     "systems": [
       {
         "system": "LIRR",
@@ -2369,280 +1255,47 @@
       }
     ]
   },
-  "Huntington": {
-    "name": "Huntington",
-    "lat": 40.85300971,
-    "lon": -73.40952576,
+  "Harlem-125 St": {
+    "name": "Harlem-125 St",
+    "lat": 40.80470411111112,
+    "lon": -73.93845788888888,
     "systems": [
       {
-        "system": "LIRR",
+        "system": "Metro North",
         "routes": [
-          "Port Jefferson Branch"
+          "New Haven",
+          "New Canaan",
+          "Danbury",
+          "Hudson",
+          "Harlem"
         ]
       },
       {
-        "system": "Amtrak",
-        "routes": [
-          "Cardinal"
-        ]
-      }
-    ]
-  },
-  "Fulton St": {
-    "name": "Fulton St",
-    "lat": 40.710197,
-    "lon": -74.007691,
-    "systems": [
-      {
         "system": "MTA Subway",
         "routes": [
-          "A",
-          "C",
-          "E",
-          "J",
-          "Z",
-          "N",
-          "R",
-          "W",
-          "2",
-          "3",
           "4",
           "5",
           "6",
           "6X"
         ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "City of New Orleans"
-        ]
       }
     ]
   },
-  "59 St-Columbus Circle": {
-    "name": "59 St-Columbus Circle",
-    "lat": 40.768296,
-    "lon": -73.981736,
+  "Marble Hill": {
+    "name": "Marble Hill",
+    "lat": 40.874447,
+    "lon": -73.91038599999999,
     "systems": [
       {
-        "system": "MTA Subway",
+        "system": "Metro North",
         "routes": [
-          "A",
-          "C",
-          "B",
-          "D",
-          "N",
-          "Q",
-          "R",
-          "W",
-          "1",
-          "2",
-          "4",
-          "5",
-          "6",
-          "6X"
+          "Hudson"
         ]
       },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Borealis",
-          "Empire Builder"
-        ]
-      }
-    ]
-  },
-  "163 St-Amsterdam Av": {
-    "name": "163 St-Amsterdam Av",
-    "lat": 40.836013,
-    "lon": -73.939892,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "C"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Maple Leaf",
-          "Empire Service"
-        ]
-      }
-    ]
-  },
-  "Utica Av": {
-    "name": "Utica Av",
-    "lat": 40.679364,
-    "lon": -73.930729,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "A",
-          "C",
-          "2",
-          "3",
-          "4",
-          "5"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Maple Leaf",
-          "Lake Shore Limited",
-          "Empire Service"
-        ]
-      }
-    ]
-  },
-  "42 St-Bryant Pk": {
-    "name": "42 St-Bryant Pk",
-    "lat": 40.754222,
-    "lon": -73.984569,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "B",
-          "D",
-          "F",
-          "FX",
-          "M"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Lake Shore Limited"
-        ]
-      }
-    ]
-  },
-  "Delancey St-Essex St": {
-    "name": "Delancey St-Essex St",
-    "lat": 40.718315,
-    "lon": -73.987437,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "M",
-          "J",
-          "Z"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Empire Builder"
-        ]
-      }
-    ]
-  },
-  "Cleveland St": {
-    "name": "Cleveland St",
-    "lat": 40.679947,
-    "lon": -73.884639,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "J",
-          "Z"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Floridian",
-          "Lake Shore Limited"
-        ]
-      }
-    ]
-  },
-  "Wilson Av": {
-    "name": "Wilson Av",
-    "lat": 40.688764,
-    "lon": -73.904046,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "L"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Amtrak Thruway Connecting Service",
-          "Palmetto",
-          "Carolinian"
-        ]
-      }
-    ]
-  },
-  "Prince St": {
-    "name": "Prince St",
-    "lat": 40.724329,
-    "lon": -73.997702,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "N",
-          "Q",
-          "R",
-          "W"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Cardinal"
-        ]
-      }
-    ]
-  },
-  "116 St-Columbia University": {
-    "name": "116 St-Columbia University",
-    "lat": 40.807722,
-    "lon": -73.96411,
-    "systems": [
       {
         "system": "MTA Subway",
         "routes": [
           "1"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Floridian"
-        ]
-      }
-    ]
-  },
-  "Middletown Rd": {
-    "name": "Middletown Rd",
-    "lat": 40.843863,
-    "lon": -73.836322,
-    "systems": [
-      {
-        "system": "MTA Subway",
-        "routes": [
-          "6",
-          "6X"
-        ]
-      },
-      {
-        "system": "Amtrak",
-        "routes": [
-          "Keystone Service"
         ]
       }
     ]

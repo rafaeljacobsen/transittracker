@@ -1,0 +1,7 @@
+{"sessionId":"38ff2a","location":"app.js:loadMTASubwayRoutes","message":"subway load start","data":{"hasData":true,"lineNames":["1","2","3","4","5","6","7","A","C","E","B","D","F","FX","M","G","J","Z","L","N","Q","R","W","S","6X","7X"],"has1":true,"has4":true,"hasB":true},"timestamp":1771882988056,"hypothesisId":"H5"}
+{"sessionId":"38ff2a","location":"app.js:subway-tracks-added","message":"tracks added","data":{"lineName":"1","tracksAdded":4},"timestamp":1771882988057,"hypothesisId":"H4"}
+{"sessionId":"38ff2a","location":"app.js:subway-route","message":"route shapes/layer","data":{"lineName":"1","routeExists":true,"shapesLength":4,"firstShapeCoordsLength":211,"layerExists":true},"timestamp":1771882988057,"hypothesisId":"H1-H3"}
+{"sessionId":"38ff2a","location":"app.js:subway-route","message":"route shapes/layer","data":{"lineName":"4","routeExists":true,"shapesLength":21,"firstShapeCoordsLength":458,"layerExists":true},"timestamp":1771882988065,"hypothesisId":"H1-H3"}
+{"sessionId":"38ff2a","location":"app.js:subway-tracks-added","message":"tracks added","data":{"lineName":"4","tracksAdded":21},"timestamp":1771882988068,"hypothesisId":"H4"}
+{"sessionId":"38ff2a","location":"app.js:subway-route","message":"route shapes/layer","data":{"lineName":"B","routeExists":true,"shapesLength":0,"firstShapeCoordsLength":0,"layerExists":true},"timestamp":1771882988111,"hypothesisId":"H1-H3"}
+{"sessionId":"38ff2a","location":"app.js:subway-tracks-added","message":"tracks added","data":{"lineName":"B","tracksAdded":7},"timestamp":1771882988114,"hypothesisId":"H4"}
