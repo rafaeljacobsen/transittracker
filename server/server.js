@@ -57,11 +57,7 @@ async function getToken() {
     throw new Error('Invalid getToken response');
   }
   if (data.errorMessage) throw new Error(data.errorMessage);
-  if (data.Authenticated !== 'True' || !data.UserToken) {
-    const e = new Error('Authentication failed');
-    e.njTransitResponse = data;
-    throw e;
-  }
+  if (data.Authenticated !== 'True' || !data.UserToken) throw new Error('Authentication failed');
   cachedToken = data.UserToken;
   tokenExpiry = Date.now() + TOKEN_TTL_MS;
   return cachedToken;
@@ -95,9 +91,7 @@ app.get('/api/nj-transit-vehicles', async (req, res) => {
     res.json(vehicles);
   } catch (err) {
     console.error('NJ Transit getVehicleData:', err.message);
-    const body = { error: err.message || 'Failed to fetch vehicle data' };
-    if (err.njTransitResponse) body.njTransitResponse = err.njTransitResponse;
-    res.status(502).json(body);
+    res.status(502).json({ error: err.message || 'Failed to fetch vehicle data' });
   }
 });
 

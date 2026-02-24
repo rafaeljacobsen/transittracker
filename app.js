@@ -9324,9 +9324,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     headsign = rd.tripToHeadsign[tripId] || (tripId.includes('_') ? rd.tripToHeadsign[tripId.split('_')[0]] : null);
                 }
                 
-                const baseIconSize = 20;
+                const baseIconSize = 26; // Match Amtrak/other rail live marker size
                 const iconSize = getIconSize(baseIconSize, map.getZoom());
-                const iconUrl = 'icons/commuterrailcirc.png';
+                const iconName = (routeName && NJ_TRANSIT_LINE_ICONS[routeName]) ? NJ_TRANSIT_LINE_ICONS[routeName] : 'ML_icon.png';
+                const iconUrl = 'icons/njtransit/' + iconName;
                 const hasNoLine = routeName === 'NJ Transit Train' || (typeof routeName === 'string' && routeName.startsWith('Trip '));
                 
                 let onClickHandler = null;
@@ -9628,8 +9629,29 @@ document.addEventListener('DOMContentLoaded', function() {
             amtrakMarkers.clear();
         }
         
-        // NJ Transit live: relative URL for Vercel (api/nj-transit-vehicles). For local Node server use 'http://localhost:3000/api/nj-transit-vehicles'. Leave empty to disable.
-        const NJ_TRANSIT_VEHICLES_URL = '/api/nj-transit-vehicles';
+        // NJ Transit live: relative URL on Vercel; when app is on localhost:8000, use Node server on 3000. Leave empty to disable.
+        const NJ_TRANSIT_VEHICLES_URL = (typeof location !== 'undefined' && location.hostname === 'localhost' && location.port === '8000')
+            ? 'http://localhost:3000/api/nj-transit-vehicles'
+            : '/api/nj-transit-vehicles';
+        // Route/line name (from njTransitRoutesData.routes) -> icon in icons/njtransit/
+        const NJ_TRANSIT_LINE_ICONS = {
+            'Atlantic City Rail Line': 'AC_icon.png',
+            'Bergen County Line': 'BC_icon.png',
+            'Gladstone Branch': 'GS_icon.png',
+            'Hudson-Bergen Light Rail': 'HBLR_icon.png',
+            'Main Line': 'ML_icon.png',
+            'Main/Bergen County Line': 'ML_icon.png',
+            'Montclair-Boonton Line': 'MC_icon.png',
+            'Morris & Essex Line': 'ME_icon.png',
+            'Newark Light Rail': 'NLR_icon.png',
+            'North Jersey Coast Line': 'NC_icon.png',
+            'Northeast Corridor': 'NE_icon.png',
+            'Pascack Valley Line': 'PV_icon.png',
+            'Port Jervis Line': 'MBPJ_MNBNP.png',
+            'Princeton Shuttle': 'PR_icon.png',
+            'Raritan Valley Line': 'RV_icon.png',
+            'Riverline Light Rail': 'RL_icon.png'
+        };
         
         // Amtrak API via CORS proxy (AmTrack API does not send CORS headers). Switch proxy if needed.
         const AMTRAK_API_BASE = 'https://amtrak-api.marcmap.app/get-trains';

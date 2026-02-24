@@ -3,7 +3,21 @@
  * GET /api/nj-transit-vehicles returns live train positions.
  * Set NJTRANSIT_USERNAME and NJTRANSIT_PASSWORD in Vercel Environment Variables.
  */
-const FormData = require('form-data');
+
+/** Build multipart/form-data body as buffer (avoids form-data stream issues). */
+function buildMultipartBody(fields) {
+  const boundary = '----NJT' + Math.random().toString(36).slice(2, 14);
+  const CRLF = '\r\n';
+  const parts = [];
+  for (const [name, value] of Object.entries(fields)) {
+    parts.push(`--${boundary}${CRLF}Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}${String(value)}${CRLF}`);
+  }
+  parts.push(`--${boundary}--${CRLF}`);
+  return {
+    body: Buffer.from(parts.join(''), 'utf8'),
+    headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+  };
+}
 
 const USE_TEST = process.env.NJTRANSIT_USE_TEST === 'true';
 const BASE = USE_TEST
@@ -26,15 +40,11 @@ async function getToken() {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
   if (!hasCredentials()) throw new Error('NJ Transit credentials not configured');
 
-  const form = new FormData();
-  form.append('username', process.env.NJTRANSIT_USERNAME);
-  form.append('password', process.env.NJTRANSIT_PASSWORD);
-
-  const res = await fetch(TOKEN_PATH, {
-    method: 'POST',
-    body: form,
-    headers: form.getHeaders(),
+  const { body, headers } = buildMultipartBody({
+    username: process.env.NJTRANSIT_USERNAME,
+    password: process.env.NJTRANSIT_PASSWORD,
   });
+  const res = await fetch(TOKEN_PATH, { method: 'POST', body, headers });
   const text = await res.text();
   let data;
   try {
@@ -51,14 +61,8 @@ async function getToken() {
 
 async function getVehicleData() {
   const token = await getToken();
-  const form = new FormData();
-  form.append('token', token);
-
-  const res = await fetch(VEHICLES_PATH, {
-    method: 'POST',
-    body: form,
-    headers: form.getHeaders(),
-  });
+  const { body, headers } = buildMultipartBody({ token });
+  const res = await fetch(VEHICLES_PATH, { method: 'POST', body, headers });
   const text = await res.text();
   let data;
   try {
