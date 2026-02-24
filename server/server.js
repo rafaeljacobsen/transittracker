@@ -6,8 +6,22 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const FormData = require('form-data');
 const path = require('path');
+
+/** Build multipart/form-data body as buffer (avoids form-data stream issues). */
+function buildMultipartBody(fields) {
+  const boundary = '----NJT' + Math.random().toString(36).slice(2, 14);
+  const CRLF = '\r\n';
+  const parts = [];
+  for (const [name, value] of Object.entries(fields)) {
+    parts.push(`--${boundary}${CRLF}Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}${String(value)}${CRLF}`);
+  }
+  parts.push(`--${boundary}--${CRLF}`);
+  return {
+    body: Buffer.from(parts.join(''), 'utf8'),
+    headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+  };
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,15 +47,8 @@ async function getToken() {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
   if (!hasCredentials()) throw new Error('NJ Transit credentials not configured');
 
-  const form = new FormData();
-  form.append('username', username);
-  form.append('password', password);
-
-  const res = await fetch(TOKEN_PATH, {
-    method: 'POST',
-    body: form,
-    headers: form.getHeaders(),
-  });
+  const { body, headers } = buildMultipartBody({ username, password });
+  const res = await fetch(TOKEN_PATH, { method: 'POST', body, headers });
   const text = await res.text();
   let data;
   try {
@@ -50,7 +57,11 @@ async function getToken() {
     throw new Error('Invalid getToken response');
   }
   if (data.errorMessage) throw new Error(data.errorMessage);
-  if (data.Authenticated !== 'True' || !data.UserToken) throw new Error('Authentication failed');
+  if (data.Authenticated !== 'True' || !data.UserToken) {
+    const e = new Error('Authentication failed');
+    e.njTransitResponse = data;
+    throw e;
+  }
   cachedToken = data.UserToken;
   tokenExpiry = Date.now() + TOKEN_TTL_MS;
   return cachedToken;
@@ -58,14 +69,8 @@ async function getToken() {
 
 async function getVehicleData() {
   const token = await getToken();
-  const form = new FormData();
-  form.append('token', token);
-
-  const res = await fetch(VEHICLES_PATH, {
-    method: 'POST',
-    body: form,
-    headers: form.getHeaders(),
-  });
+  const { body, headers } = buildMultipartBody({ token });
+  const res = await fetch(VEHICLES_PATH, { method: 'POST', body, headers });
   const text = await res.text();
   let data;
   try {
@@ -90,7 +95,9 @@ app.get('/api/nj-transit-vehicles', async (req, res) => {
     res.json(vehicles);
   } catch (err) {
     console.error('NJ Transit getVehicleData:', err.message);
-    res.status(502).json({ error: err.message || 'Failed to fetch vehicle data' });
+    const body = { error: err.message || 'Failed to fetch vehicle data' };
+    if (err.njTransitResponse) body.njTransitResponse = err.njTransitResponse;
+    res.status(502).json(body);
   }
 });
 
