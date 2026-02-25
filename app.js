@@ -9629,10 +9629,14 @@ document.addEventListener('DOMContentLoaded', function() {
             amtrakMarkers.clear();
         }
         
-        // NJ Transit live: relative URL on Vercel; when app is on localhost:8000, use Node server on 3000. Leave empty to disable.
-        const NJ_TRANSIT_VEHICLES_URL = (typeof location !== 'undefined' && location.hostname === 'localhost' && location.port === '8000')
-            ? 'http://localhost:3000/api/nj-transit-vehicles'
-            : '/api/nj-transit-vehicles';
+        // NJ Transit live: on Vercel use relative URL; on GitHub Pages use Vercel API; on localhost:8000 use Node server. Set to your Vercel app URL if different.
+        const NJ_TRANSIT_VERCEL_ORIGIN = 'https://transittracker.vercel.app';
+        const NJ_TRANSIT_VEHICLES_URL = (function() {
+            if (typeof location === 'undefined') return '/api/nj-transit-vehicles';
+            if (location.hostname === 'localhost' && location.port === '8000') return 'http://localhost:3000/api/nj-transit-vehicles';
+            if (location.origin !== NJ_TRANSIT_VERCEL_ORIGIN && NJ_TRANSIT_VERCEL_ORIGIN) return NJ_TRANSIT_VERCEL_ORIGIN + '/api/nj-transit-vehicles';
+            return '/api/nj-transit-vehicles';
+        })();
         // Route/line name (from njTransitRoutesData.routes) -> icon in icons/njtransit/
         const NJ_TRANSIT_LINE_ICONS = {
             'Atlantic City Rail Line': 'AC_icon.png',
