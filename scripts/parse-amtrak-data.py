@@ -21,6 +21,8 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from simplify_polyline import simplify_shapes_dict
+
 try:
     import requests
     from bs4 import BeautifulSoup
@@ -321,7 +323,7 @@ class AmtrakDataParser:
         """Parse shapes.txt to get track geometry"""
         print("\n🗺️  Parsing track shapes...")
         shapes_data = self.read_csv_from_file('shapes.txt')
-        
+
         # Group by shape_id
         shapes_dict = defaultdict(list)
         for row in shapes_data:
@@ -332,15 +334,19 @@ class AmtrakDataParser:
                     'lon': float(row.get('shape_pt_lon', 0)),
                     'sequence': int(row.get('shape_pt_sequence', 0))
                 })
-        
+
         # Sort each shape by sequence
         shapes = {}
         for shape_id, points in shapes_dict.items():
             sorted_points = sorted(points, key=lambda x: x['sequence'])
             # Convert to [lat, lon] pairs
             shapes[shape_id] = [[p['lat'], p['lon']] for p in sorted_points]
-        
+
         print(f"✅ Found {len(shapes)} track shapes")
+        # Distance-bounded simplification: tracks won't move more than ~10 ft from their true location.
+        # Drastically shrinks the output JSON (Amtrak shapes are very dense) and the browser's
+        # render cost is proportional to the point count.
+        shapes = simplify_shapes_dict(shapes, tolerance_meters=3.048)
         return shapes
     
     def parse_stops(self, fetch_official_names=True):

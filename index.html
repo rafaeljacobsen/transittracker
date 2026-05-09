@@ -4,7 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Regional Transit Tracker - MBTA & MTA</title>
-    
+
+    <!-- Perf timing: measure how long each phase takes so we can pinpoint slowness. -->
+    <script>
+        window.__perfMarks = [];
+        window.__perfMark = function(label) {
+            const t = performance.now();
+            const last = window.__perfMarks[window.__perfMarks.length - 1];
+            const delta = last ? (t - last.t).toFixed(0) : 0;
+            window.__perfMarks.push({ label, t, delta });
+            console.log(`[perf] ${label} @ ${t.toFixed(0)}ms (+${delta}ms since prev)`);
+        };
+        window.__perfMark('html-head-start');
+        // PerformanceObserver for resource timing — log slow scripts/data files as they finish.
+        try {
+            new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    if (entry.initiatorType === 'script' && entry.duration > 200) {
+                        console.log(`[perf] slow script: ${entry.name.split('/').pop()} ` +
+                                    `dur=${entry.duration.toFixed(0)}ms ` +
+                                    `transfer=${(entry.transferSize/1024/1024).toFixed(2)}MB ` +
+                                    `decoded=${(entry.decodedBodySize/1024/1024).toFixed(2)}MB`);
+                    }
+                }
+            }).observe({ type: 'resource', buffered: true });
+        } catch (_) {}
+    </script>
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icons/commuterrailcirc.png">
     
@@ -14,15 +40,15 @@
           crossorigin=""/>
     
     <!-- Leaflet JavaScript -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
-    
+
     <!-- Polyline decoder for encoded polylines -->
-    <script src="https://unpkg.com/polyline@0.2.0/src/polyline.js"></script>
-    
+    <script defer src="https://unpkg.com/polyline@0.2.0/src/polyline.js"></script>
+
     <!-- Protocol Buffers for GTFS-RT -->
-    <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js"></script>
     
     <!-- Custom Styles -->
     <link rel="stylesheet" href="styles.css">
@@ -483,84 +509,70 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Loading progress bar: shown by app.js while agency data, route polylines, and
+                 stops are being processed; hidden once everything is on the map. Sits below
+                 the checkbox controls so the user can see what phase is currently loading. -->
+            <div id="loading-progress" style="display: none; margin: 8px 12px 12px; font-size: 11px; color: #444;">
+                <div id="loading-progress-label" style="margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                    <span id="loading-progress-phase">Loading…</span>
+                    <span id="loading-progress-percent" style="color: #888; font-variant-numeric: tabular-nums;">0%</span>
+                </div>
+                <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                    <div id="loading-progress-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #06b6d4); border-radius: 3px; transition: width 120ms ease-out;"></div>
+                </div>
+            </div>
         </div>
     </div>
-    
 
-    
 
-    
 
-    <!-- Include the MBTA stops data -->
-    <script src="data/mbta-stops.js"></script>
-    
-    <!-- Include the MBTA bus data -->
-    <script src="data/mbta-bus-data.js"></script>
-    
-    <!-- Include the MBTA shuttle data -->
-    <script src="data/mbta-shuttle-data.js"></script>
-    
-    <!-- Include the MBTA Silver Line data -->
-    <script src="data/mbta-silver-line-data.js"></script>
-    
-    <!-- Include the MBTA ferry data -->
-    <script src="data/mbta-ferry-data.js"></script>
-    
-    <!-- Include LIRR data (if available) -->
+
+    <!-- Data globals: declared up-front so subsequent (deferred) data scripts assign into them safely. -->
     <script>
-        // Placeholder for LIRR data - will be replaced when data file is generated
+        window.__perfMark('body-end-inline-start');
         let lirrRoutesData = null;
-    </script>
-    <script src="data/lirr-routes-data.js" onerror="console.log('LIRR routes data not yet generated')"></script>
-    
-    <!-- Include Metro North data (if available) -->
-    <script>
-        // Placeholder for Metro North data - will be replaced when data file is generated
         let metroNorthRoutesData = null;
-    </script>
-    <script src="data/metro-north-routes-data.js" onerror="console.log('Metro North routes data not yet generated')"></script>
-    
-    <!-- Include MTA Subway data (if available) -->
-    <script>
-        // Placeholder for MTA Subway data - will be replaced when data file is generated
         let mtaSubwayRoutesData = null;
-    </script>
-    <script src="data/mta-subway-routes-data.js" onerror="console.log('MTA Subway routes data not yet generated')"></script>
-    
-    <!-- Include CTrail Shore Line East data (if available) -->
-    <script>
-        // Placeholder for Shore Line East data - will be replaced when data file is generated
         let shoreLineEastRoutesData = null;
-    </script>
-    <script src="data/shore-line-east-routes-data.js" onerror="console.log('Shore Line East routes data not yet generated')"></script>
-    
-    <!-- Include Amtrak data (if available) -->
-    <script>
-        // Placeholder for Amtrak data - will be replaced when data file is generated
         let amtrakRoutesData = null;
-    </script>
-    <script src="data/amtrak-routes-data.js" onerror="console.log('Amtrak routes data not yet generated')"></script>
-    
-    <!-- Include CTrail Hartford Line data (if available) -->
-    <script>
-        // Placeholder for Hartford Line data - will be replaced when data file is generated
         let hartfordLineRoutesData = null;
-    </script>
-    <script src="data/hartford-line-routes-data.js" onerror="console.log('Hartford Line routes data not yet generated')"></script>
-    
-    <!-- Include NJ Transit rail data (if available) -->
-    <script>
         let njTransitRoutesData = null;
+        // Pre-computed Amtrak ↔ other-agency station connections (built by
+        // scripts/build-amtrak-connections.py). If absent the runtime just shows no
+        // connections in tooltips — Amtrak still works, it just doesn't know about
+        // adjacent MBTA / MTA / etc. stations until the script is run.
+        let amtrakConnectionsData = null;
     </script>
-    <script src="data/nj-transit-routes-data.js" onerror="console.log('NJ Transit routes data not yet generated')"></script>
-    
-    <!-- Include SEPTA rail data -->
-    <script src="data/septa-routes-data.js"></script>
 
-    <!-- Tab switching functionality -->
-    <!-- Note: switchTab function is now defined in app.js to access route loading functions -->
+    <!-- All data files load with `defer` so they parallel-download in the background and execute in
+         document order before DOMContentLoaded — without blocking HTML/CSS render.
+         The PerformanceObserver in <head> logs each script's download time as it completes. -->
+    <script defer src="data/mbta-stops.js"></script>
+    <script defer src="data/mbta-bus-data.js"></script>
+    <script defer src="data/mbta-shuttle-data.js"></script>
+    <script defer src="data/mbta-silver-line-data.js"></script>
+    <script defer src="data/mbta-ferry-data.js"></script>
+    <script defer src="data/lirr-routes-data.js" onerror="console.log('LIRR routes data not yet generated')"></script>
+    <script defer src="data/metro-north-routes-data.js" onerror="console.log('Metro North routes data not yet generated')"></script>
+    <script defer src="data/mta-subway-routes-data.js" onerror="console.log('MTA Subway routes data not yet generated')"></script>
+    <script defer src="data/shore-line-east-routes-data.js" onerror="console.log('Shore Line East routes data not yet generated')"></script>
+    <script defer src="data/amtrak-routes-data.js" onerror="console.log('Amtrak routes data not yet generated')"></script>
+    <script defer src="data/hartford-line-routes-data.js" onerror="console.log('Hartford Line routes data not yet generated')"></script>
+    <script defer src="data/nj-transit-routes-data.js" onerror="console.log('NJ Transit routes data not yet generated')"></script>
+    <script defer src="data/septa-routes-data.js"></script>
+    <script defer src="data/amtrak-connections.js" onerror="console.log('Amtrak connections not yet generated; run scripts/build-amtrak-connections.py')"></script>
 
     <!-- Main Application -->
-    <script src="app.js"></script>
+    <script defer src="app.js"></script>
+    <script>
+        // Listeners that fire after the deferred queue runs.
+        document.addEventListener('DOMContentLoaded', () => {
+            window.__perfMark('DOMContentLoaded');
+            // At this point all defer scripts have finished EXECUTING. Dump a summary table.
+            try { console.table(window.__perfMarks); } catch (_) {}
+        });
+        window.addEventListener('load', () => window.__perfMark('window.load'));
+    </script>
 </body>
 </html>

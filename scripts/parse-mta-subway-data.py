@@ -12,6 +12,9 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from simplify_polyline import simplify_shapes_dict
+
+
 # MTA Subway Line Colors (official MTA colors)
 # Format: route_short_name -> hex color
 MTA_LINE_COLORS = {
@@ -147,6 +150,8 @@ class MTASubwayDataParser:
             shapes[shape_id] = [[p['lat'], p['lon']] for p in sorted_points]
         
         print(f"✅ Found {len(shapes)} track shapes")
+        # Distance-bounded simplification: tracks won't move more than ~10 ft from their true location.
+        shapes = simplify_shapes_dict(shapes, tolerance_meters=3.048)
         return shapes
     
     def parse_stops(self):

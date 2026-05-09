@@ -13,6 +13,8 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from simplify_polyline import simplify_shapes_dict
+
 
 class SEPTARailDataParser:
     def __init__(self):
@@ -102,6 +104,8 @@ class SEPTARailDataParser:
             sorted_points = sorted(points, key=lambda x: x["sequence"])
             shapes[shape_id] = [[p["lat"], p["lon"]] for p in sorted_points]
         print(f"✅ Found {len(shapes)} shapes")
+        # Distance-bounded simplification: tracks won't move more than ~10 ft from their true location.
+        shapes = simplify_shapes_dict(shapes, tolerance_meters=3.048)
         return shapes
 
     def parse_stops(self):

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-29T11:46:08.918611",
+  "timestamp": "2026-04-28T23:24:51.942110",
   "source": "CTrail Shore Line East GTFS",
   "agency": "Shore Line East",
   "totalRoutes": 1,
@@ -197,52 +197,22 @@
       "shapes": [],
       "stops": [
         {
+          "stop_id": "OSB",
+          "name": "Old Saybrook Amtrak Station",
+          "lat": 41.30039,
+          "lon": -72.376818
+        },
+        {
           "stop_id": "STM",
           "name": "Stamford Amtrak Station",
           "lat": 41.04713,
           "lon": -73.54216
         },
         {
-          "stop_id": "BRP",
-          "name": "Bridgeport Amtrak Station",
-          "lat": 41.178006,
-          "lon": -73.187539
-        },
-        {
-          "stop_id": "GUI",
-          "name": "Guilford",
-          "lat": 41.275603,
-          "lon": -72.673513
-        },
-        {
-          "stop_id": "STS",
-          "name": "New Haven",
-          "lat": 41.305253,
-          "lon": -72.922086
-        },
-        {
-          "stop_id": "CLN",
-          "name": "Clinton",
-          "lat": 41.279458,
-          "lon": -72.528314
-        },
-        {
-          "stop_id": "NLC",
-          "name": "New London",
-          "lat": 41.354267,
-          "lon": -72.093225
-        },
-        {
-          "stop_id": "MDS",
-          "name": "Madison",
-          "lat": 41.283577,
-          "lon": -72.599444
-        },
-        {
-          "stop_id": "OSB",
-          "name": "Old Saybrook Amtrak Station",
-          "lat": 41.30039,
-          "lon": -72.376818
+          "stop_id": "BNF",
+          "name": "Branford",
+          "lat": 41.274549,
+          "lon": -72.817225
         },
         {
           "stop_id": "NHV",
@@ -251,16 +221,46 @@
           "lon": -72.92667
         },
         {
+          "stop_id": "NLC",
+          "name": "New London",
+          "lat": 41.354267,
+          "lon": -72.093225
+        },
+        {
+          "stop_id": "GUI",
+          "name": "Guilford",
+          "lat": 41.275603,
+          "lon": -72.673513
+        },
+        {
+          "stop_id": "MDS",
+          "name": "Madison",
+          "lat": 41.283577,
+          "lon": -72.599444
+        },
+        {
+          "stop_id": "CLN",
+          "name": "Clinton",
+          "lat": 41.279458,
+          "lon": -72.528314
+        },
+        {
           "stop_id": "WSB",
           "name": "Westbrook",
           "lat": 41.288787,
           "lon": -72.448
         },
         {
-          "stop_id": "BNF",
-          "name": "Branford",
-          "lat": 41.274549,
-          "lon": -72.817225
+          "stop_id": "BRP",
+          "name": "Bridgeport Amtrak Station",
+          "lat": 41.178006,
+          "lon": -73.187539
+        },
+        {
+          "stop_id": "STS",
+          "name": "New Haven",
+          "lat": 41.305253,
+          "lon": -72.922086
         }
       ],
       "type": "commuter_rail",

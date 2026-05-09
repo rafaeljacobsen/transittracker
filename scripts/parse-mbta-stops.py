@@ -241,11 +241,18 @@ js_content += "    module.exports = { mbtaStopsData, stopToRoutes, routeShapes }
 js_content += "}\n"
 
 # Save to file
+import json
 from pathlib import Path
 data_dir = Path("data")
 data_dir.mkdir(exist_ok=True)
 with open(data_dir / "mbta-stops.js", "w", encoding="utf-8") as f:
     f.write(js_content)
+
+# Also emit a JSON sibling that downstream Python tools (e.g. build-amtrak-connections.py)
+# can read without having to parse JS-flavored syntax. The shape mirrors mbtaStopsData:
+#   { "Blue Line": [{ name, coords: [lat, lon], type, stopId }, ...], ... }
+with open(data_dir / "mbta-stops.json", "w", encoding="utf-8") as f:
+    json.dump(final_data, f, indent=2, ensure_ascii=False)
 
 print("\n" + "="*50)
 print("MBTA STOPS PARSING COMPLETE")

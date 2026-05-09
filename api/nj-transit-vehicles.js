@@ -26,9 +26,16 @@ const BASE = USE_TEST
 const TOKEN_PATH = `${BASE}/api/TrainData/getToken`;
 const VEHICLES_PATH = `${BASE}/api/TrainData/getVehicleData`;
 const TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
+// Vehicle data cache: NJ Transit positions update every ~30s upstream, but the client polls every 5s.
+// Caching for 4s collapses concurrent client polls into a single upstream hit and absorbs bursts
+// across users hitting the same Vercel instance.
+const VEHICLE_CACHE_TTL_MS = 4000;
 
 let cachedToken = null;
 let tokenExpiry = 0;
+let cachedVehicles = null;
+let cachedVehiclesExpiry = 0;
+let inFlightVehiclesPromise = null;
 
 function hasCredentials() {
   const u = process.env.NJTRANSIT_USERNAME || '';
@@ -59,7 +66,7 @@ async function getToken() {
   return cachedToken;
 }
 
-async function getVehicleData() {
+async function fetchVehicleDataUpstream() {
   const token = await getToken();
   const { body, headers } = buildMultipartBody({ token });
   const res = await fetch(VEHICLES_PATH, { method: 'POST', body, headers });
@@ -73,6 +80,21 @@ async function getVehicleData() {
   if (data.errorMessage) throw new Error(data.errorMessage);
   if (!Array.isArray(data)) return [];
   return data;
+}
+
+async function getVehicleData() {
+  const now = Date.now();
+  if (cachedVehicles && now < cachedVehiclesExpiry) return cachedVehicles;
+  // Coalesce concurrent requests into a single upstream call.
+  if (inFlightVehiclesPromise) return inFlightVehiclesPromise;
+  inFlightVehiclesPromise = fetchVehicleDataUpstream()
+    .then(data => {
+      cachedVehicles = data;
+      cachedVehiclesExpiry = Date.now() + VEHICLE_CACHE_TTL_MS;
+      return data;
+    })
+    .finally(() => { inFlightVehiclesPromise = null; });
+  return inFlightVehiclesPromise;
 }
 
 module.exports = async (req, res) => {
@@ -90,6 +112,9 @@ module.exports = async (req, res) => {
   }
   try {
     const vehicles = await getVehicleData();
+    // Allow Vercel's edge / CDN to serve a fresh copy for 4s and a stale copy for up to 30s while
+    // revalidating in the background. Matches the in-memory cache TTL above.
+    res.setHeader('Cache-Control', 's-maxage=4, stale-while-revalidate=30');
     res.json(vehicles);
   } catch (err) {
     console.error('NJ Transit getVehicleData:', err.message);

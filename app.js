@@ -1,8 +1,144 @@
 // Global variables that need to be accessible outside DOMContentLoaded
 let map; // Leaflet map instance - needs to be global for switchTab function
 
+// Timing: app.js top-level executed (after defer queue drained for previous scripts).
+if (typeof window !== 'undefined' && window.__perfMark) window.__perfMark('app.js:top-level-start');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Loading progress tracker
+//
+// One bar lives at #loading-progress in the info-panel. We track multiple
+// concurrent "tasks" (MBTA route processing, Amtrak chunked loads, agency
+// route loads, combined-stations fetch, etc.). The bar shows the most-recently-
+// updated active task and its percentage; once every task reports finish, it
+// fades out. Each task is identified by a stable string key.
+//
+// Public API:
+//   loadingProgress.start(key, label, [totalSteps])  — register a task; if you
+//       know the total step count up-front, pass it and call .step(key) per
+//       chunk. Otherwise call .update(key, percent01) yourself.
+//   loadingProgress.step(key)                         — increment 1 step.
+//   loadingProgress.update(key, percent01)           — set 0–1 progress.
+//   loadingProgress.finish(key)                      — mark done.
+// ─────────────────────────────────────────────────────────────────────────────
+const loadingProgress = (() => {
+    const tasks = new Map(); // key → { label, progress, total, current, done }
+    let lastActive = null;
+    let hideTimer = null;
+
+    function getEls() {
+        return {
+            wrap: document.getElementById('loading-progress'),
+            phase: document.getElementById('loading-progress-phase'),
+            pct: document.getElementById('loading-progress-percent'),
+            fill: document.getElementById('loading-progress-fill'),
+        };
+    }
+
+    function render() {
+        const els = getEls();
+        if (!els.wrap) return;
+        // Most-recently-touched active task (so a new phase visually takes over).
+        const activeKey = [lastActive, ...tasks.keys()].find(k => k && tasks.get(k) && !tasks.get(k).done);
+        if (!activeKey) {
+            // All tasks done — hide after a short delay so a 100% flash is visible.
+            if (els.wrap.style.display !== 'none' && !hideTimer) {
+                hideTimer = setTimeout(() => {
+                    els.wrap.style.display = 'none';
+                    tasks.clear();
+                    lastActive = null;
+                    hideTimer = null;
+                }, 400);
+            }
+            return;
+        }
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        const t = tasks.get(activeKey);
+        const pct = Math.max(0, Math.min(100, Math.round((t.progress || 0) * 100)));
+        els.wrap.style.display = '';
+        els.phase.textContent = t.label;
+        els.pct.textContent = pct + '%';
+        els.fill.style.width = pct + '%';
+    }
+
+    return {
+        start(key, label, totalSteps) {
+            tasks.set(key, { label, progress: 0, total: totalSteps || null, current: 0, done: false });
+            lastActive = key;
+            render();
+        },
+        update(key, percent01) {
+            const t = tasks.get(key);
+            if (!t) return;
+            t.progress = percent01;
+            lastActive = key;
+            render();
+        },
+        step(key) {
+            const t = tasks.get(key);
+            if (!t || !t.total) return;
+            t.current++;
+            t.progress = Math.min(1, t.current / t.total);
+            lastActive = key;
+            render();
+        },
+        finish(key) {
+            const t = tasks.get(key);
+            if (!t) return;
+            t.progress = 1;
+            t.done = true;
+            render();
+        },
+    };
+})();
+
+// Page-visibility flag: true while this browser tab is foreground/visible. Each agency's polling
+// loop checks this and skips its work when hidden, so a backgrounded tab doesn't keep hitting 7+
+// transit APIs every 5 s. We refresh immediately on becoming visible so users don't see stale data.
+let _pageVisible = (typeof document !== 'undefined') ? document.visibilityState !== 'hidden' : true;
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        const wasHidden = !_pageVisible;
+        _pageVisible = document.visibilityState !== 'hidden';
+        if (_pageVisible && wasHidden && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            // Let live trackers immediately refetch on resume.
+            try { window.dispatchEvent(new Event('app:visible')); } catch (_) {}
+        }
+    });
+}
+
+// Shared, cached loader for the GTFS-Realtime proto definition.
+// Without this, Metro-North / LIRR / SEPTA each re-parse the .proto file on every poll (every 5 s).
+// The promise is memoized so concurrent callers share a single network/parse pass.
+let _gtfsRealtimeProtoPromise = null;
+function getGtfsRealtimeProto() {
+    if (_gtfsRealtimeProtoPromise) return _gtfsRealtimeProtoPromise;
+    // Resolve the proto path the same way the MTA Subway loader does, so it works on GitHub Pages
+    // where the site is hosted under a repo subpath (e.g. /transittracker/).
+    let protoPath = './gtfs-realtime.proto';
+    try {
+        const pathname = window.location.pathname;
+        if (pathname !== '/' && pathname !== '/index.html') {
+            const pathParts = pathname.split('/').filter(p => p);
+            if (pathParts.length > 0 && pathParts[pathParts.length - 1] === 'index.html') {
+                pathParts.pop();
+            }
+            if (pathParts.length > 0) {
+                protoPath = '/' + pathParts.join('/') + '/gtfs-realtime.proto';
+            }
+        }
+    } catch (_) { /* fall back to relative path */ }
+    _gtfsRealtimeProtoPromise = protobuf.load(protoPath).catch(err => {
+        // Don't memoize a failed load — let the next caller retry.
+        _gtfsRealtimeProtoPromise = null;
+        throw err;
+    });
+    return _gtfsRealtimeProtoPromise;
+}
+
 // Wrap everything in DOMContentLoaded to ensure DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.__perfMark) window.__perfMark('app.js:DOMContentLoaded-handler-start');
     // Global variables - declare these first
     const trainMarkers = new Map();
         const ferryMarkers = new Map();
@@ -148,7 +284,23 @@ document.addEventListener('DOMContentLoaded', function() {
             throw new Error('MBTA data not loaded');
         }
         
-        // Initialize the map centered on New York/Long Island (SVG renderer so station/track clicks work)
+        if (window.__perfMark) window.__perfMark('init:before-map-create');
+        // Initialize the map centered on New York/Long Island.
+        // We use SVG (the Leaflet default) rather than `preferCanvas: true`. Canvas mode is
+        // theoretically faster for thousands of polylines, but it broke per-pane hit-testing:
+        // each pane's <canvas> element absorbed clicks at empty pixels, so the topmost canvas
+        // (e.g. combinedStationsPane) intercepted clicks meant for stops below. With SVG, every
+        // shape is its own DOM element and pane z-index controls hit-test order correctly.
+        // Pre-render a full viewport's worth of padding around the visible area on every
+        // SVG renderer (one per pane — Amtrak, commuter rail, bus, …). Default padding is 0.1
+        // (10%); panning more than that forces Leaflet to re-clip and re-render every visible
+        // polyline, which is the source of the "stutter" mid-pan. Padding 1.0 means the user
+        // can pan a whole screen in any direction before a re-render is triggered. Cost is a
+        // larger SVG viewbox, which is cheap — paths off-screen still don't paint. Set on the
+        // class default so auto-created renderers for custom panes (amtrakPane, busPane, …)
+        // all inherit it.
+        L.SVG.mergeOptions({ padding: 1.0 });
+
         map = L.map('map', {
             // Performance optimizations for smoother panning
             zoomAnimation: true,
@@ -216,7 +368,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         map.createPane('combinedStationsPane');
         map.getPane('combinedStationsPane').style.zIndex = 455; // Above other stops so gold markers are always on top
-        
+
+        // Stub kept so existing layer-creation call sites continue to work after we reverted
+        // from canvas to SVG rendering. Returning `undefined` makes Leaflet pick its default
+        // renderer (SVG, with one <svg> element per pane), which gives correct per-pane
+        // hit-testing for clicks via DOM-level event dispatch.
+        function getRendererForPane(_paneName) {
+            return undefined;
+        }
+
         // Add click handler to map to reset highlight when clicking empty space.
         // Ignore clicks that hit an interactive layer (station, track, etc.) so highlighting a line by clicking a station doesn't immediately get cleared by a bubbling map click.
         map.on('click', function(e) {
@@ -289,11 +449,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 weight: weight,
                 opacity: opacity
             };
-            
+
             if (pane) {
                 polylineOptions.pane = pane;
+                polylineOptions.renderer = getRendererForPane(pane);
             }
-            
+
             const trackLine = L.polyline(coords, polylineOptions);
             
             if (popupText) {
@@ -331,6 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const marker = L.circleMarker(coords, {
                 pane: pane,
+                renderer: getRendererForPane(pane),
                 radius: radius,
                 baseRadius: baseRadius,
                 fillColor: fillColor,
@@ -439,39 +601,47 @@ document.addEventListener('DOMContentLoaded', function() {
             const zoomSufficient = currentZoom >= BUS_STOPS_MIN_ZOOM;
             const busRoutesChecked = isChecked('show-bus-paths');
             const shouldShowBusStops = zoomSufficient && busRoutesChecked;
-            
-            // Only update if state changed
+
             if (shouldShowBusStops !== busStopsVisible) {
                 busStopsVisible = shouldShowBusStops;
                 toggleBusStopsVisibility(shouldShowBusStops);
             }
-            
-            // Update all stop marker sizes based on zoom - use cached collections for performance
-            // Only update markers that are actually on the map
+
+            // Update stop marker sizes — bucketed by getStopRadius (only 3 buckets across all
+            // zoom levels), so the new radius matches the last-applied one most of the time.
+            // Skip the setRadius DOM mutation when nothing actually changed. Hidden circles
+            // (display:none) are also skipped — they get fixed lazily when un-hidden.
             stopMarkersCache.forEach(marker => {
-                if (map.hasLayer(marker)) {
-                    const baseRadius = marker.options.baseRadius || 5;
-                    const newRadius = getStopRadius(baseRadius, currentZoom);
-                    marker.setRadius(newRadius);
-                }
+                if (!map.hasLayer(marker)) return;
+                if (marker._path && marker._path.style.display === 'none') return;
+                const baseRadius = marker.options.baseRadius || 5;
+                const newRadius = getStopRadius(baseRadius, currentZoom);
+                if (marker._appliedRadius === newRadius) return;
+                marker._appliedRadius = newRadius;
+                marker.setRadius(newRadius);
             });
-            
-            // Update live vehicle icon markers - use cached collections for performance
+
+            // Vehicle markers — getIconSize is bucketed (7 buckets). Across most zoom
+            // changes the bucket flips for some buckets but not others, and within the same
+            // bucket nothing should happen at all. Previously this loop allocated a fresh
+            // L.icon per marker on every zoomend, even when the size hadn't changed —
+            // thousands of unnecessary DOM rebuilds. Cache the last applied size and skip.
             liveVehicleMarkersCache.forEach(marker => {
-                if (map.hasLayer(marker)) {
-                    const icon = marker.options.icon;
-                    const baseIconSize = icon.options.baseIconSize;
-                    if (baseIconSize) {
-                        const newSize = getIconSize(baseIconSize, currentZoom);
-                        const newIcon = L.icon({
-                            iconUrl: icon.options.iconUrl,
-                            iconSize: [newSize, newSize],
-                            iconAnchor: [newSize / 2, newSize / 2],
-                            baseIconSize: baseIconSize // Preserve base size
-                        });
-                        marker.setIcon(newIcon);
-                    }
-                }
+                if (!map.hasLayer(marker)) return;
+                if (marker._icon && marker._icon.style.display === 'none') return;
+                const icon = marker.options.icon;
+                const baseIconSize = icon && icon.options && icon.options.baseIconSize;
+                if (!baseIconSize) return;
+                const newSize = getIconSize(baseIconSize, currentZoom);
+                if (marker._appliedIconSize === newSize) return;
+                marker._appliedIconSize = newSize;
+                const newIcon = L.icon({
+                    iconUrl: icon.options.iconUrl,
+                    iconSize: [newSize, newSize],
+                    iconAnchor: [newSize / 2, newSize / 2],
+                    baseIconSize: baseIconSize
+                });
+                marker.setIcon(newIcon);
             });
         });
         
@@ -686,6 +856,93 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof septaRoutesData !== 'undefined' && septaRoutesData && septaRoutesData.routes) {
             septaLines = Object.keys(septaRoutesData.routes);
         }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // AGENCY REGISTRY
+        //
+        // Single source of truth for the per-agency metadata that highlighting / visibility
+        // logic loops over. Adding a new agency now means appending one entry here (plus
+        // populating its `lines` array and `markers` Map elsewhere). All loops in
+        // `clearAllHighlightStateExcept`, `hideEverythingExcept`, `restoreAllLayersAndMarkers`,
+        // and `shouldShowMarker` iterate this list — so they stay in sync automatically.
+        //
+        // `getLines()` / `getMarkers()` are lazy thunks because the underlying arrays/Maps
+        // are mutated (e.g. lazy-loaded after page load) and we want a live view, not a
+        // snapshot.
+        //
+        // The MBTA-bus / shuttle / silver-line / ferry collections aren't first-class
+        // agencies in the highlight system — they're hidden uniformly by the MBTA-rail
+        // entry whenever any non-MBTA highlight is active. They have their own checkbox
+        // gating handled in the MBTA-specific highlight functions.
+        // ─────────────────────────────────────────────────────────────────────────────
+        // `layerKeyPrefix`: agencies whose route IDs collide with another agency's (e.g. MTA Subway
+        // "1" vs MBTA Bus "1") prefix their layer keys so they remain unambiguous. Used by
+        // `hideEverythingExcept` to translate {agency, line} items into the right layer key.
+        const AGENCIES = [
+            { key: 'mbta',          layerKeyPrefix: null,         getLines: () => [...subwayLines, ...commuterLines, ...seasonalLines], getMarkers: () => trainMarkers,         liveCheckbox: 'show-subway-live'         },
+            { key: 'lirr',          layerKeyPrefix: null,         getLines: () => lirrLines,           getMarkers: () => lirrMarkers,           liveCheckbox: 'show-lirr-live'           },
+            { key: 'metroNorth',    layerKeyPrefix: null,         getLines: () => metroNorthLines,     getMarkers: () => metroNorthMarkers,     liveCheckbox: 'show-metro-north-live'    },
+            { key: 'subway',        layerKeyPrefix: 'mta-subway', getLines: () => mtaSubwayLines,      getMarkers: () => mtaSubwayMarkers,      liveCheckbox: 'show-mta-subway-live'     },
+            { key: 'shoreLineEast', layerKeyPrefix: null,         getLines: () => shoreLineEastLines,  getMarkers: () => shoreLineEastMarkers,  liveCheckbox: 'show-shore-line-east-live'},
+            { key: 'amtrak',        layerKeyPrefix: null,         getLines: () => amtrakLines,         getMarkers: () => amtrakMarkers,         liveCheckbox: 'show-amtrak-live'         },
+            { key: 'hartfordLine',  layerKeyPrefix: null,         getLines: () => hartfordLineLines,   getMarkers: () => hartfordLineMarkers,   liveCheckbox: 'show-hartford-line-live'  },
+            { key: 'njTransit',     layerKeyPrefix: null,         getLines: () => njTransitLines,      getMarkers: () => njTransitMarkers,      liveCheckbox: 'show-nj-transit-live'     },
+            { key: 'septa',         layerKeyPrefix: null,         getLines: () => septaLines,          getMarkers: () => septaMarkers,          liveCheckbox: 'show-septa-live'          },
+        ];
+
+        // Fast lookup by agency key (rebuilt once; AGENCIES is static).
+        const AGENCY_BY_KEY = {};
+        AGENCIES.forEach(a => { AGENCY_BY_KEY[a.key] = a; });
+
+        // Convert a {agency, line} item to its layer key. Encapsulates the "MTA Subway/MBTA Bus
+        // are prefixed, others aren't" disambiguation in ONE place — so the highlight system
+        // never confuses bus "1" with subway "1" again.
+        function layerKeyForItem(item) {
+            const a = AGENCY_BY_KEY[item.agency];
+            const prefix = a && a.layerKeyPrefix;
+            return prefix ? prefix + '-' + item.line : item.line;
+        }
+
+        // Sugar: build a list of {agency, line} items from one agency's display names.
+        function items(agency, lines) {
+            return (Array.isArray(lines) ? lines : [lines]).map(line => ({ agency, line }));
+        }
+
+        // Map agency key → the global `let` variable that stores its current highlight.
+        // We keep the 10 separate variables because ~317 callsites read them directly;
+        // this lookup centralizes WRITES so adding/cleaning an agency is one entry.
+        function getAgencyHighlight(key) {
+            switch (key) {
+                case 'mbta':          return highlightedLine;
+                case 'lirr':          return highlightedLIRRLine;
+                case 'metroNorth':    return highlightedMetroNorthLine;
+                case 'subway':        return highlightedSubwayLine;
+                case 'shoreLineEast': return highlightedShoreLineEastLine;
+                case 'amtrak':        return highlightedAmtrakLine;
+                case 'hartfordLine':  return highlightedHartfordLineLine;
+                case 'njTransit':     return highlightedNJTransitLine;
+                case 'septa':         return highlightedSEPTALine;
+                default:              return null;
+            }
+        }
+
+        // Null out every agency's highlight var EXCEPT `exceptKey` (and also clear the
+        // station-highlight, which never co-exists with a line highlight). Used by every
+        // highlight function so cross-agency leakage is impossible.
+        function clearAllHighlightStateExcept(exceptKey) {
+            if (exceptKey !== 'mbta')          highlightedLine = null;
+            if (exceptKey !== 'lirr')          highlightedLIRRLine = null;
+            if (exceptKey !== 'metroNorth')    highlightedMetroNorthLine = null;
+            if (exceptKey !== 'subway')        highlightedSubwayLine = null;
+            if (exceptKey !== 'shoreLineEast') highlightedShoreLineEastLine = null;
+            if (exceptKey !== 'amtrak')        highlightedAmtrakLine = null;
+            if (exceptKey !== 'hartfordLine')  highlightedHartfordLineLine = null;
+            if (exceptKey !== 'njTransit')     highlightedNJTransitLine = null;
+            if (exceptKey !== 'septa')         highlightedSEPTALine = null;
+            highlightedCombinedStation = null;
+        }
+
+        if (window.__perfMark) window.__perfMark('init:lines-populated');
 
         // Initialize checkbox cache for performance
         initCheckboxCache();
@@ -1894,42 +2151,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Process routes in chunks to prevent UI freezing
                 const routes = Object.entries(mbtaStopsData);
                 const chunkSize = 5; // Process 5 routes at a time
-                
+                loadingProgress.start('mbta-routes', 'Drawing MBTA subway & commuter rail', routes.length);
+
                 const processChunk = (startIndex) => {
                     const endIndex = Math.min(startIndex + chunkSize, routes.length);
                     const chunk = routes.slice(startIndex, endIndex);
-                    
+
                     chunk.forEach(([lineName, stops]) => {
                         const color = lineColors[lineName] || '#666';
                         const result = processRoute(lineName, stops, color);
-                        
+
                         // Batch add markers and tracks to layers
                         result.markers.forEach(marker => {
                             markers.push(marker);
                             layers[lineName].addLayer(marker);
                         });
-                        
+
                         result.tracks.forEach(track => {
                             markers.push(track);
                             layers[lineName].addLayer(track);
                         });
+                        loadingProgress.step('mbta-routes');
                     });
-                    
+
                     // Process next chunk if there are more routes
                     if (endIndex < routes.length) {
                         requestAnimationFrame(() => processChunk(endIndex)); // Use requestAnimationFrame for smoother rendering
                     } else {
-        
+                        loadingProgress.finish('mbta-routes');
                     }
                 };
-                
+
                 // Start processing
+                if (window.__perfMark) window.__perfMark('init:before-processChunk(0)');
                 processChunk(0);
-                
+                if (window.__perfMark) window.__perfMark('init:after-mbta-route-processChunk-kicked-off');
+
             } else {
                 console.error('Cannot create markers: mbtaStopsData or routeShapes is undefined');
             }
-            
+
             // Create bus route markers and tracks - OPTIMIZED WITH CHUNKED LOADING
             // Don't load all bus routes at once - only initialize layers
             if (mbtaBusData) {
@@ -2009,7 +2270,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 });
             }
-        
+            if (window.__perfMark) window.__perfMark('init:after-ferry-init');
+
         // Update stats display (no-op since stats were removed)
         function updateStats() {
             // Stats display was removed - function kept for compatibility
@@ -2079,7 +2341,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             color: color,
                             weight: 4,
                             opacity: 0.7,
-                            pane: 'busPane'
+                            pane: 'busPane',
+                            renderer: getRendererForPane('busPane')
                         });
                         trackLine.bindPopup(`<b>${displayName}</b>`);
                         layers[routeKeyStr].addLayer(trackLine);
@@ -2263,6 +2526,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const marker = L.circleMarker(stop.coords, {
                         pane: 'stopsPane',
+                        renderer: getRendererForPane('stopsPane'),
                         radius: radius,
                         baseRadius: baseRadius, // Store for zoom updates
                         fillColor: color,
@@ -2273,7 +2537,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         interactive: true,
                         bubblingMouseEvents: false
                     });
-                    
+
                     // Build tooltip text showing all routes
                     const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
                     const tooltipText = `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>${isMultiRoute ? 'Routes' : 'Route'}: ${routesText}<br>Type: ${stop.type}</div>`;
@@ -2520,12 +2784,19 @@ document.addEventListener('DOMContentLoaded', function() {
             loadLIRRStations();
         }
         
-        // Function to load LIRR stations (visible at all zoom levels)
+        // Function to load LIRR stations (visible at all zoom levels).
+        // Like Amtrak, we render one marker per (stop, route) pair instead of deduping —
+        // otherwise stops shared across branches (Penn Station, Jamaica, Mineola, etc.) get
+        // assigned to whichever branch's layer was iterated first, and they DISAPPEAR when
+        // highlighting any other branch they actually belong to (e.g. Oyster Bay highlights
+        // were silently dropping Penn Station and Jamaica because both live in Babylon
+        // Branch's layer). The duplicate markers overlap pixel-perfectly so it's visually
+        // identical but each layer's hide/show now correctly includes all its real stops.
         function loadLIRRStations() {
             if (typeof lirrRoutesData === 'undefined' || !lirrRoutesData || !lirrRoutesData.routes) {
                 return;
             }
-            
+
             // First pass: Build a map of stop_id -> routes serving that stop
             const stopToRoutes = new Map();
             lirrLines.forEach(lineName => {
@@ -2542,23 +2813,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 }
             });
-            
-            // Second pass: Create ONE marker per unique stop (not per route)
-            const renderedLIRRStops = new Set();
-            
+
+            // Second pass: render every (stop, route) pair (no dedupe).
             lirrLines.forEach(lineName => {
                 const route = lirrRoutesData.routes[lineName];
-                const color = lineColors[lineName] || '#00305E'; // Get route color
-                
+                const color = lineColors[lineName] || '#00305E';
+
                 if (!route || !route.stops) {
                     return;
                 }
-                
-                // Add each stop to this route's layer (only if not already rendered)
+
                 route.stops.forEach(stop => {
-                    // Skip if already rendered
-                    if (stop.lat && stop.lon && !renderedLIRRStops.has(stop.stop_id)) {
-                        renderedLIRRStops.add(stop.stop_id);
+                    if (stop.lat && stop.lon) {
                         
                         // Get all routes serving this stop
                         const stopInfo = stopToRoutes.get(stop.stop_id);
@@ -2583,6 +2849,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             opacity: 1,
                             fillOpacity: 0.8,
                             pane: 'stopsPane',
+                            renderer: getRendererForPane('stopsPane'),
                             interactive: true,
                             bubblingMouseEvents: false
                         });
@@ -2760,23 +3027,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Second pass: Create ONE marker per unique stop (not per route)
-            const renderedMetroNorthStops = new Set();
-            
+            // Second pass: render every (stop, route) pair (no dedupe) so shared stops like
+            // Grand Central, Yankees–E. 153 St, etc. live in EVERY layer they belong to —
+            // otherwise highlighting one Metro-North line silently hides shared stops that
+            // happen to be assigned to a sibling line's layer. Same architectural fix as LIRR.
             metroNorthLines.forEach(lineName => {
                 const route = metroNorthRoutesData.routes[lineName];
-                // Use route color from data, fallback to lineColors, then default
                 const color = route?.color || lineColors[lineName] || '#003A70';
-                
+
                 if (!route || !route.stops) {
                     return;
                 }
-                
-                // Add each stop to this route's layer (only if not already rendered)
+
                 route.stops.forEach(stop => {
-                    // Skip if already rendered
-                    if (stop.lat && stop.lon && !renderedMetroNorthStops.has(stop.stop_id)) {
-                        renderedMetroNorthStops.add(stop.stop_id);
+                    if (stop.lat && stop.lon) {
                         
                         // Get all routes serving this stop
                         const stopInfo = stopToRoutes.get(stop.stop_id);
@@ -2956,6 +3220,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         opacity: 1,
                         fillOpacity: 0.8,
                         pane: 'stopsPane',
+                        renderer: getRendererForPane('stopsPane'),
                         interactive: true,
                         bubblingMouseEvents: false
                     });
@@ -3079,6 +3344,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         opacity: 1,
                         fillOpacity: 0.8,
                         pane: 'stopsPane',
+                        renderer: getRendererForPane('stopsPane'),
                         interactive: true,
                         bubblingMouseEvents: false
                     });
@@ -3399,34 +3665,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 return;
             }
-            
+
             // Check if Amtrak data is available
             if (typeof amtrakRoutesData === 'undefined' || !amtrakRoutesData || !amtrakRoutesData.routes) {
                 return;
             }
-            
+
             amtrakRoutesLoading = true;
-            
+
             // Show loading indicator
             const loadingIndicator = document.getElementById('amtrak-loading-indicator');
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'table-row';
             }
-            
-            // Process routes
-            amtrakLines.forEach(lineName => {
+
+            // Amtrak's data is huge (32+ MB, hundreds of routes with many shapes each). Synchronous
+            // processing was blocking the main thread for ~7.5 s during page init. We chunk via
+            // requestAnimationFrame so the page stays responsive and routes paint progressively.
+            const CHUNK_SIZE = 4;
+            let cursor = 0;
+            loadingProgress.start('amtrak-routes', 'Drawing Amtrak routes', amtrakLines.length);
+
+            function processOneRoute(lineName) {
                 const route = amtrakRoutesData.routes[lineName];
-                if (!route) {
-                    return;
-                }
-                // Use route color from data, fallback to lineColors, then default
+                if (!route) return;
                 const color = route.color || lineColors[lineName] || '#CAE4F1';
-                
-                // Render route shapes if available
                 if (route.shapes && route.shapes.length > 0) {
-                    route.shapes.forEach((shape, shapeIndex) => {
-                        let coords = shape.coords;
-                        
+                    route.shapes.forEach((shape) => {
+                        const coords = shape.coords;
                         if (coords && Array.isArray(coords) && coords.length > 1) {
                             const trackLine = renderRouteTrack(coords, {
                                 color: color,
@@ -3436,8 +3702,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                 popupText: `<b>Amtrak: ${lineName}</b><br>Route ID: ${route.route_id || 'N/A'}`,
                                 onClick: function(e) {
                                     L.DomEvent.stopPropagation(e);
-                                    
-                                    // Toggle highlighting
                                     if (highlightedAmtrakLine === lineName) {
                                         resetAmtrakHighlight();
                                     } else {
@@ -3445,32 +3709,39 @@ document.addEventListener('DOMContentLoaded', function() {
                                     }
                                 }
                             });
-                            
                             if (trackLine) {
                                 layers[lineName].addLayer(trackLine);
                             }
-                        } else {
                         }
                     });
-                } else {
                 }
-                
-                // Add to map if requested
                 if (showOnMap && layers[lineName]) {
                     map.addLayer(layers[lineName]);
                 }
-            });
-            
-            // Hide loading indicator
-            if (loadingIndicator) {
-                loadingIndicator.style.display = 'none';
             }
-            
-            amtrakRoutesLoaded = true;
-            amtrakRoutesLoading = false;
-            
-            // Load Amtrak stations after routes
-            loadAmtrakStations();
+
+            function processChunk() {
+                const end = Math.min(cursor + CHUNK_SIZE, amtrakLines.length);
+                for (let i = cursor; i < end; i++) {
+                    processOneRoute(amtrakLines[i]);
+                    loadingProgress.step('amtrak-routes');
+                }
+                cursor = end;
+
+                if (cursor < amtrakLines.length) {
+                    requestAnimationFrame(processChunk);
+                } else {
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    amtrakRoutesLoaded = true;
+                    amtrakRoutesLoading = false;
+                    loadingProgress.finish('amtrak-routes');
+                    // Stations after routes — chunked internally and reports its own
+                    // progress, so we just hand it the completion callback.
+                    loadAmtrakStations(onComplete);
+                }
+            }
+
+            processChunk();
         }
         
         // Amtrak station connections mapping (built automatically)
@@ -3746,133 +4017,158 @@ document.addEventListener('DOMContentLoaded', function() {
             return findAllConnections(station, 'amtrak');
         }
         
-        // Function to load Amtrak stations (visible at all zoom levels)
-        function loadAmtrakStations() {
+        // Function to load Amtrak stations (visible at all zoom levels).
+        // Chunked via requestAnimationFrame so the main thread stays responsive while we
+        // create one marker per (stop, route) pair — a stop served by N routes ends up in
+        // N different route layers (Toledo on both Capitol Limited AND Lake Shore Limited,
+        // etc.) so highlighting any one of those routes keeps the marker visible.
+        //
+        // Cross-system station connections (e.g. South Station ↔ Providence/Stoughton MBTA)
+        // are PRE-COMPUTED by scripts/build-amtrak-connections.py and loaded as
+        // `amtrakConnectionsData`. Doing this at runtime was the single biggest cost of
+        // the "Adding Amtrak stations" phase — an O(amtrak_stops × all_other_stops)
+        // Haversine sweep that has nothing to do with anything dynamic.
+        function loadAmtrakStations(onComplete) {
             if (typeof amtrakRoutesData === 'undefined' || !amtrakRoutesData || !amtrakRoutesData.routes) {
+                if (onComplete) onComplete();
                 return;
             }
-            
-            // First pass: Build a map of stop_id -> routes serving that stop
+
+            // Seed the connections cache from the pre-computed file (if present). Anything
+            // not in this map gets an empty connections list at runtime — we no longer call
+            // findAllConnections() during page load.
+            if (amtrakConnectionsData && typeof amtrakConnectionsData === 'object') {
+                Object.keys(amtrakConnectionsData).forEach(stopId => {
+                    amtrakStationConnections.set(stopId, amtrakConnectionsData[stopId]);
+                });
+            }
+
+            // Phase 1 (sync, fast): build stop_id → {stop, routes[]} map.
             const stopToRoutes = new Map();
             amtrakLines.forEach(lineName => {
                 const route = amtrakRoutesData.routes[lineName];
                 if (route && route.stops) {
                     route.stops.forEach(stop => {
                         if (!stopToRoutes.has(stop.stop_id)) {
-                            stopToRoutes.set(stop.stop_id, {
-                                stop: stop,
-                                routes: []
-                            });
+                            stopToRoutes.set(stop.stop_id, { stop: stop, routes: [] });
                         }
                         stopToRoutes.get(stop.stop_id).routes.push(lineName);
                     });
                 }
             });
-            
-            // Build connection mapping for all Amtrak stations (finds connections to ALL other systems)
-            stopToRoutes.forEach((stopInfo, stopId) => {
-                const connections = findAllConnections(stopInfo.stop, 'amtrak');
-                if (connections.length > 0) {
-                    amtrakStationConnections.set(stopId, connections);
-                }
-            });
-            
-            // Second pass: Create ONE marker per unique stop (not per route)
-            // Track which stops have been rendered to avoid duplicates
-            const renderedAmtrakStops = new Set();
-            
+
+            // Phase 2 (chunked): create one marker per (route, stop) pair. Flat work list
+            // so progress stepping is uniform across routes.
+            const work = [];
             amtrakLines.forEach(lineName => {
                 const route = amtrakRoutesData.routes[lineName];
-                const color = route?.color || lineColors[lineName] || '#CAE4F1';
-                
-                if (!route || !route.stops) {
-                    return;
-                }
-                
-                // Add each stop to this route's layer (only if not already rendered)
+                if (!route || !route.stops) return;
                 route.stops.forEach(stop => {
-                    // Skip if already rendered
-                    if (stop.lat && stop.lon && !renderedAmtrakStops.has(stop.stop_id)) {
-                        renderedAmtrakStops.add(stop.stop_id);
-                        
-                        const stopInfo = stopToRoutes.get(stop.stop_id);
-                        const servingRoutes = stopInfo.routes;
-                        const isMultiRoute = servingRoutes.length > 1;
-                        const fillColor = isMultiRoute ? '#D3D3D3' : color;
-                        
-                        const baseRadius = 5;
-                        const currentZoom = map.getZoom();
-                        const radius = getStopRadius(baseRadius, currentZoom);
-                        
-                        const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
-                        
-                        // Get connections for this station
-                        const connections = amtrakStationConnections.get(stop.stop_id) || [];
-                        let connectionsText = '';
-                        if (connections.length > 0) {
-                            const connectionLines = [...new Set(connections.map(c => c.lineName))];
-                            connectionsText = `<br>Connections: ${connectionLines.join(', ')}`;
-                        }
-                        
-                        const tooltipText = isMultiRoute ? 
-                            `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Amtrak<br>Lines: ${routesText}${connectionsText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>` :
-                            `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Amtrak<br>Line: ${routesText}${connectionsText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>`;
-                        
-                        const tooltipDirection = stop.lat < 40.76 ? 'bottom' : 'top';
-                        
-                        const onClickHandler = function(e) {
-                            L.DomEvent.stopPropagation(e);
-                            const servingRoutes = stopInfo.routes;
-                            const alreadyHighlighted = Array.isArray(highlightedAmtrakLine) 
-                                ? JSON.stringify(highlightedAmtrakLine.sort()) === JSON.stringify(servingRoutes.sort())
-                                : highlightedAmtrakLine === lineName && servingRoutes.length === 1;
-                            
-                            if (highlightedAmtrakLine && !alreadyHighlighted) {
-                                const isCurrentlyDimmed = Array.isArray(highlightedAmtrakLine)
-                                    ? !servingRoutes.some(route => highlightedAmtrakLine.includes(route))
-                                    : !servingRoutes.includes(highlightedAmtrakLine);
-                                
-                                if (isCurrentlyDimmed) {
-                                    return;
-                                }
-                            }
-                            
-                            // Get connections for this station
-                            const connections = amtrakStationConnections.get(stop.stop_id) || [];
-                            
-                            if (alreadyHighlighted) {
-                                resetAmtrakHighlight();
-                            } else {
-                                if (servingRoutes.length > 1) {
-                                    highlightMultipleAmtrakLines(servingRoutes, connections);
-                                } else {
-                                    highlightAmtrakLine(servingRoutes[0], connections);
-                                }
-                            }
-                        };
-                        
-                        const stationMarker = renderStopMarker([stop.lat, stop.lon], {
-                            radius: radius,
-                            baseRadius: baseRadius,
-                            fillColor: fillColor,
-                            color: '#fff',
-                            weight: 1.5,
-                            opacity: 1,
-                            fillOpacity: 0.8,
-                            pane: 'stopsPane',
-                            tooltipText: tooltipText,
-                            tooltipDirection: tooltipDirection,
-                            onClick: onClickHandler,
-                            interactive: true,
-                            bubblingMouseEvents: false
-                        });
-                        
-                        if (layers[lineName] && stationMarker) {
-                            layers[lineName].addLayer(stationMarker);
-                        }
-                    }
+                    if (stop.lat && stop.lon) work.push({ lineName, stop });
                 });
             });
+
+            if (work.length === 0) {
+                if (onComplete) onComplete();
+                return;
+            }
+
+            loadingProgress.start('amtrak-stations', 'Adding Amtrak stations', work.length);
+
+            const CHUNK_SIZE = 25;
+            let cursor = 0;
+
+            function processOne(lineName, stop) {
+                const route = amtrakRoutesData.routes[lineName];
+                const color = route?.color || lineColors[lineName] || '#CAE4F1';
+                const stopInfo = stopToRoutes.get(stop.stop_id);
+                const servingRoutes = stopInfo.routes;
+                const isMultiRoute = servingRoutes.length > 1;
+                const fillColor = isMultiRoute ? '#D3D3D3' : color;
+
+                const baseRadius = 5;
+                const currentZoom = map.getZoom();
+                const radius = getStopRadius(baseRadius, currentZoom);
+
+                const routesText = isMultiRoute ? servingRoutes.join(', ') : lineName;
+
+                // Connections were pre-computed at build time; just look them up.
+                const connections = amtrakStationConnections.get(stop.stop_id) || [];
+                let connectionsText = '';
+                if (connections.length > 0) {
+                    const connectionLines = [...new Set(connections.map(c => c.lineName))];
+                    connectionsText = `<br>Connections: ${connectionLines.join(', ')}`;
+                }
+
+                const tooltipText = isMultiRoute ?
+                    `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Amtrak<br>Lines: ${routesText}${connectionsText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>` :
+                    `<div style="font-size: 11px; line-height: 1.3; margin: 0; padding: 0; overflow-wrap: break-word;"><b>${stop.name}</b><br>Type: Amtrak<br>Line: ${routesText}${connectionsText}<br>Coordinates: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</div>`;
+
+                const tooltipDirection = stop.lat < 40.76 ? 'bottom' : 'top';
+
+                const onClickHandler = function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    const localServingRoutes = stopInfo.routes;
+                    const alreadyHighlighted = Array.isArray(highlightedAmtrakLine)
+                        ? JSON.stringify(highlightedAmtrakLine.sort()) === JSON.stringify(localServingRoutes.sort())
+                        : highlightedAmtrakLine === lineName && localServingRoutes.length === 1;
+
+                    if (highlightedAmtrakLine && !alreadyHighlighted) {
+                        const isCurrentlyDimmed = Array.isArray(highlightedAmtrakLine)
+                            ? !localServingRoutes.some(r => highlightedAmtrakLine.includes(r))
+                            : !localServingRoutes.includes(highlightedAmtrakLine);
+                        if (isCurrentlyDimmed) return;
+                    }
+
+                    const localConnections = amtrakStationConnections.get(stop.stop_id) || [];
+                    if (alreadyHighlighted) {
+                        resetAmtrakHighlight();
+                    } else {
+                        if (localServingRoutes.length > 1) {
+                            highlightMultipleAmtrakLines(localServingRoutes, localConnections);
+                        } else {
+                            highlightAmtrakLine(localServingRoutes[0], localConnections);
+                        }
+                    }
+                };
+
+                const stationMarker = renderStopMarker([stop.lat, stop.lon], {
+                    radius: radius,
+                    baseRadius: baseRadius,
+                    fillColor: fillColor,
+                    color: '#fff',
+                    weight: 1.5,
+                    opacity: 1,
+                    fillOpacity: 0.8,
+                    pane: 'stopsPane',
+                    tooltipText: tooltipText,
+                    tooltipDirection: tooltipDirection,
+                    onClick: onClickHandler,
+                    interactive: true,
+                    bubblingMouseEvents: false
+                });
+
+                if (layers[lineName] && stationMarker) {
+                    layers[lineName].addLayer(stationMarker);
+                }
+            }
+
+            function processChunk() {
+                const end = Math.min(cursor + CHUNK_SIZE, work.length);
+                for (let i = cursor; i < end; i++) {
+                    processOne(work[i].lineName, work[i].stop);
+                    loadingProgress.step('amtrak-stations');
+                }
+                cursor = end;
+                if (cursor < work.length) {
+                    requestAnimationFrame(processChunk);
+                } else {
+                    loadingProgress.finish('amtrak-stations');
+                    if (onComplete) onComplete();
+                }
+            }
+
+            processChunk();
         }
         
         // Function to load Hartford Line routes
@@ -4223,22 +4519,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // Second pass: Create ONE marker per unique stop (not per route)
-            const renderedSubwayStops = new Set();
-            
+            // Second pass: render every (stop, route) pair (no dedupe). Same architectural
+            // fix as LIRR / Amtrak / Metro-North — Times Sq–42 St serves the 1, 2, 3, 7, N,
+            // Q, R, W, S; without per-line markers, highlighting any one of those lines
+            // silently drops the station from the visible set.
             mtaSubwayLines.forEach(lineName => {
                 const route = mtaSubwayRoutesData.routes[lineName];
                 const color = route.color || lineColors[lineName] || '#808183';
-                
+
                 if (!route || !route.stops) {
                     return;
                 }
-                
-                // Add each stop to this route's layer (only if not already rendered)
+
                 route.stops.forEach(stop => {
-                    // Skip if already rendered
-                    if (stop.lat && stop.lon && !renderedSubwayStops.has(stop.stop_id)) {
-                        renderedSubwayStops.add(stop.stop_id);
+                    if (stop.lat && stop.lon) {
                         
                         // Get all routes serving this stop
                         const stopInfo = stopToRoutes.get(stop.stop_id);
@@ -4328,7 +4622,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                const baseRadius = 5.5; // Slightly bigger than regular stops (5)
+                const baseRadius = 5; // Match regular stop size — distinguished by gold color, not size
                 const currentZoom = map.getZoom();
                 const radius = getStopRadius(baseRadius, currentZoom);
                 
@@ -4343,7 +4637,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const tooltipDirection = station.lat < 41.0 ? 'bottom' : 'top';
                 
-                // Create marker with gold center, white outline; on top of other stops, fully opaque
+                // Create marker with gold center, white outline; on top of other stops, fully opaque.
+                // `interactive: true` + `bubblingMouseEvents: false` are required for canvas-mode hit
+                // testing — without them, clicks may pass through the marker to the polyline behind it.
                 const marker = L.circleMarker([station.lat, station.lon], {
                     radius: radius,
                     fillColor: '#FFD700', // Gold center
@@ -4351,7 +4647,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     weight: 1.5,
                     opacity: 1,
                     fillOpacity: 1,
-                    pane: 'combinedStationsPane'
+                    pane: 'combinedStationsPane',
+                    renderer: getRendererForPane('combinedStationsPane'),
+                    interactive: true,
+                    bubblingMouseEvents: false
                 });
                 
                 marker.bindTooltip(tooltipText, {
@@ -4505,8 +4804,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const layersToRemove = [];
             const layersToAdd = [];
             
-            // Hide all other tracks: only show highlighted MBTA layers; remove every other system (MTA, LIRR, Metro North, SLE, Amtrak, Hartford)
+            // Hide all other tracks: only show highlighted MBTA layers; remove every other system (MTA, LIRR, Metro North, SLE, Amtrak, Hartford).
+            // The combined-stations overlay (gold multi-system markers) is a UI layer, not a transit line, and must stay visible during highlights.
             Object.keys(layers).forEach(layerKey => {
+                if (layerKey === 'combined-stations') return; // never dim/remove the multi-system stations overlay
                 const isOtherAgency = layerKey.startsWith('mta-subway-') || lirrLines.includes(layerKey) || metroNorthLines.includes(layerKey) || njTransitLines.includes(layerKey) || septaLines.includes(layerKey) || shoreLineEastLines.includes(layerKey) || amtrakLines.includes(layerKey) || hartfordLineLines.includes(layerKey);
                 const isDimmed = isOtherAgency ? true : (layerKey.startsWith('mbta-bus-') ? !lineNamesStr.includes(displayNameFromLayerKey(layerKey)) : !lineNamesStr.includes(layerKey));
                 const layer = layers[layerKey];
@@ -4834,371 +5135,89 @@ document.addEventListener('DOMContentLoaded', function() {
         // Function to highlight multiple LIRR lines (for multi-line stops)
         function highlightMultipleLIRRLines(lineNames) {
             highlightedLIRRLine = lineNames;
-            highlightedLine = null; // Clear MBTA highlighting
-            highlightedSubwayLine = null; // Clear subway highlighting
-            highlightedNJTransitLine = null;
-            highlightedSEPTALine = null;
-            
-            // Remove all dimmed LIRR layers from map, keep highlighted ones
-            lirrLines.forEach(lineName => {
-                const isDimmed = !lineNames.includes(lineName);
-                
-                if (isDimmed) {
-                    // Remove dimmed layer from map
-                    if (layers[lineName] && map.hasLayer(layers[lineName])) {
-                        map.removeLayer(layers[lineName]);
-                    }
-                } else {
-                    // Ensure highlighted layer is on map
-                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                        map.addLayer(layers[lineName]);
-                    }
-                }
-            });
-            
-            // Remove/show live LIRR markers
+            clearAllHighlightStateExcept('lirr');
+            hideEverythingExcept(items('lirr', lineNames));
+            busStopLayers.forEach(layer => { if (map.hasLayer(layer)) map.removeLayer(layer); });
+            // Special-case: when the user clicked an unmatched-route LIRR train, all LIRR lines
+            // are passed in. Re-show OTHER unmatched LIRR markers too — `hideEverythingExcept`
+            // matches by exact routeName, so it can't re-add them on its own.
             const showingEntireLIRR = lineNames.length === lirrLines.length;
-            lirrMarkers.forEach((marker, trainId) => {
-                if (!marker) return;
-                const hasNoLine = !marker.routeName || marker.routeName === 'LIRR Train' ||
-                    (typeof marker.routeName === 'string' && marker.routeName.startsWith('Trip '));
-                const isOnHighlightedLine = marker.routeName && lineNames.includes(marker.routeName);
-                const showMarker = isOnHighlightedLine || (showingEntireLIRR && hasNoLine);
-                if (showMarker) {
-                    if (!map.hasLayer(marker)) marker.addTo(map);
-                } else {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            
-            // Hide all Metro North live markers when highlighting LIRR
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            // Hide all MTA Subway live markers when highlighting LIRR
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide all non-LIRR layers when highlighting LIRR lines
-            Object.keys(layers).forEach(layerName => {
-                if (!lirrLines.includes(layerName)) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            // Hide all MBTA bus stop layers
-            busStopLayers.forEach((layer, layerName) => {
-                if (map.hasLayer(layer)) {
-                    map.removeLayer(layer);
-                }
-            });
-            
-            // Remove all MBTA live vehicle markers
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, busId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, silverId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, ferryId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
+            if (showingEntireLIRR && isChecked('show-lirr-live')) {
+                lirrMarkers.forEach((marker) => {
+                    if (!marker) return;
+                    const hasNoLine = !marker.routeName || marker.routeName === 'LIRR Train' ||
+                        (typeof marker.routeName === 'string' && marker.routeName.startsWith('Trip '));
+                    if (hasNoLine && !map.hasLayer(marker)) marker.addTo(map);
+                });
+            }
         }
-        
+
         // Function to highlight a specific LIRR line and dim all others
         function highlightLIRRLine(lineName) {
-            
             highlightedLIRRLine = lineName;
-            highlightedLine = null;
-            highlightedSubwayLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedNJTransitLine = null;
-            highlightedSEPTALine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            
-            hideEverythingExcept([lineName]);
+            clearAllHighlightStateExcept('lirr');
+            hideEverythingExcept(items('lirr', lineName));
         }
-        
+
         // Function to reset LIRR highlighting (unified path: clear + restore)
         function resetLIRRHighlight() {
             clearAllHighlightState();
             restoreAllLayersAndMarkers();
         }
-        
+
         // Metro North Highlighting Functions
-        
+
         // Function to highlight multiple Metro North lines (for multi-line stops)
         function highlightMultipleMetroNorthLines(lineNames) {
             highlightedMetroNorthLine = lineNames;
-            highlightedLine = null; // Clear MBTA highlighting
-            highlightedLIRRLine = null; // Clear LIRR highlighting
-            highlightedNJTransitLine = null;
-            highlightedSEPTALine = null;
-            highlightedSubwayLine = null; // Clear subway highlighting
-            
-            // Remove all dimmed Metro North layers from map, keep highlighted ones
-            metroNorthLines.forEach(lineName => {
-                const isDimmed = !lineNames.includes(lineName);
-                
-                if (isDimmed) {
-                    if (layers[lineName] && map.hasLayer(layers[lineName])) {
-                        map.removeLayer(layers[lineName]);
-                    }
-                } else {
-                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                        map.addLayer(layers[lineName]);
-                    }
-                }
-            });
-            
-            // Remove/show live Metro North markers
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && marker.routeName) {
-                    const isDimmed = !lineNames.includes(marker.routeName);
-                    
-                    if (isDimmed) {
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
-                    }
-                } else {
-                    // If marker doesn't have routeName, hide it
-                    if (map.hasLayer(marker)) {
-                        map.removeLayer(marker);
-                    }
-                }
-            });
-            
-            // Hide all LIRR live markers when highlighting Metro North
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide all MBTA lines when highlighting Metro North lines
-            Object.keys(layers).forEach(layerName => {
-                // Skip Metro North lines
-                if (!metroNorthLines.includes(layerName)) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            // Hide all LIRR lines when highlighting Metro North lines
-            lirrLines.forEach(layerName => {
-                if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                    map.removeLayer(layers[layerName]);
-                }
-            });
-            
-            // Remove all LIRR live train markers
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
+            clearAllHighlightStateExcept('metroNorth');
+            hideEverythingExcept(items('metroNorth', lineNames));
         }
-        
+
         // Function to highlight a specific Metro North line and dim all others
         function highlightMetroNorthLine(lineName) {
-
             highlightedMetroNorthLine = lineName;
-            highlightedLine = null; // Clear MBTA highlighting
-            highlightedLIRRLine = null; // Clear LIRR highlighting
-            highlightedNJTransitLine = null;
-            highlightedSEPTALine = null;
-            highlightedSubwayLine = null; // Clear subway highlighting
-
-            // Always show the highlighted line (even if checkbox is off)
-            if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                map.addLayer(layers[lineName]);
-            }
-            
-            // Remove dimmed layers from map or show highlighted one
-            metroNorthLines.forEach(layerName => {
-                const isDimmed = layerName !== lineName;
-                
-                if (isDimmed) {
-                    // Remove dimmed layer from map
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                } else {
-                    // Ensure highlighted layer is on map
-                    if (layers[layerName] && !map.hasLayer(layers[layerName])) {
-                        map.addLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            // Remove/show live Metro North markers
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && marker.routeName) {
-                    const isDimmed = marker.routeName !== lineName;
-                    
-                    if (isDimmed) {
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
-                    }
-                } else {
-                    // If marker doesn't have routeName, hide it
-                    if (map.hasLayer(marker)) {
-                        map.removeLayer(marker);
-                    }
-                }
-            });
-            
-            // Re-evaluate visibility of all markers using centralized function
-            updateAllMarkerVisibility();
-            
-            // Hide all non-Metro North layers when highlighting Metro North lines
-            Object.keys(layers).forEach(layerName => {
-                if (!metroNorthLines.includes(layerName)) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            // Remove all LIRR live train markers
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
+            clearAllHighlightStateExcept('metroNorth');
+            hideEverythingExcept(items('metroNorth', lineName));
         }
-        
+
         // Function to reset Metro North highlighting (unified path: clear + restore)
         function resetMetroNorthHighlight() {
             clearAllHighlightState();
             restoreAllLayersAndMarkers();
         }
-        
+
         // NJ Transit Highlighting Functions
         function highlightMultipleNJTransitLines(lineNames) {
             highlightedNJTransitLine = lineNames;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            njTransitLines.forEach(lineName => {
-                const isDimmed = !lineNames.includes(lineName);
-                if (isDimmed && layers[lineName] && map.hasLayer(layers[lineName])) map.removeLayer(layers[lineName]);
-                else if (!isDimmed && layers[lineName] && !map.hasLayer(layers[lineName])) map.addLayer(layers[lineName]);
-            });
-            // Hide other systems' layers
-            Object.keys(layers).forEach(layerName => {
-                if (!njTransitLines.includes(layerName) && layers[layerName] && map.hasLayer(layers[layerName])) {
-                    map.removeLayer(layers[layerName]);
-                }
-            });
-            // Hide live markers from other systems
-            [lirrMarkers, metroNorthMarkers, mtaSubwayMarkers, septaMarkers, shoreLineEastMarkers, amtrakMarkers, hartfordLineMarkers, trainMarkers, busMarkers, shuttleMarkers, silverLineMarkers, ferryMarkers].forEach(markerMap => {
-                markerMap.forEach((marker) => {
-                    if (marker && map.hasLayer(marker)) map.removeLayer(marker);
-                });
-            });
-            busStopLayers.forEach((layer) => { if (layer && map.hasLayer(layer)) map.removeLayer(layer); });
+            clearAllHighlightStateExcept('njTransit');
+            hideEverythingExcept(items('njTransit', lineNames));
         }
-        
+
         function highlightNJTransitLine(lineName) {
             highlightedNJTransitLine = lineName;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            hideEverythingExcept([lineName]);
+            clearAllHighlightStateExcept('njTransit');
+            hideEverythingExcept(items('njTransit', lineName));
         }
-        
+
         function resetNJTransitHighlight() {
             clearAllHighlightState();
             restoreAllLayersAndMarkers();
         }
-        
+
         // SEPTA Highlighting Functions
         function highlightMultipleSEPTALines(lineNames) {
             highlightedSEPTALine = lineNames;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedNJTransitLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            septaLines.forEach(lineName => {
-                const isDimmed = !lineNames.includes(lineName);
-                if (isDimmed && layers[lineName] && map.hasLayer(layers[lineName])) map.removeLayer(layers[lineName]);
-                else if (!isDimmed && layers[lineName] && !map.hasLayer(layers[lineName])) map.addLayer(layers[lineName]);
-            });
-            Object.keys(layers).forEach(layerName => {
-                if (!septaLines.includes(layerName) && layers[layerName] && map.hasLayer(layers[layerName])) {
-                    map.removeLayer(layers[layerName]);
-                }
-            });
-            [lirrMarkers, metroNorthMarkers, mtaSubwayMarkers, njTransitMarkers, shoreLineEastMarkers, amtrakMarkers, hartfordLineMarkers, trainMarkers, busMarkers, shuttleMarkers, silverLineMarkers, ferryMarkers].forEach(markerMap => {
-                markerMap.forEach((marker) => {
-                    if (marker && map.hasLayer(marker)) map.removeLayer(marker);
-                });
-            });
-            busStopLayers.forEach((layer) => { if (layer && map.hasLayer(layer)) map.removeLayer(layer); });
+            clearAllHighlightStateExcept('septa');
+            hideEverythingExcept(items('septa', lineNames));
         }
-        
+
         function highlightSEPTALine(lineName) {
             highlightedSEPTALine = lineName;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedNJTransitLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            hideEverythingExcept([lineName]);
+            clearAllHighlightStateExcept('septa');
+            hideEverythingExcept(items('septa', lineName));
         }
-        
+
         function resetSEPTAHighlight() {
             clearAllHighlightState();
             restoreAllLayersAndMarkers();
@@ -5210,254 +5229,266 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof marker.closePopup === 'function') marker.closePopup();
             if (typeof marker.closeTooltip === 'function') marker.closeTooltip();
         }
+
+        // Toggle a layer's visibility WITHOUT detaching it from the map. This is dramatically
+        // cheaper than removeLayer/addLayer because it skips reprojection and DOM creation —
+        // we only flip a `display` style on existing SVG paths and marker icons. Recurses into
+        // LayerGroup/FeatureGroup children. No-op for layers not yet rendered (no _path/_icon).
+        // Used by the highlight/unhighlight path so toggling a route is one paint, not a
+        // cascade of attach/detach operations across frames.
+        function setLayerSubtreeHidden(layer, hidden) {
+            if (!layer) return;
+            if (typeof layer.eachLayer === 'function') {
+                layer.eachLayer(child => setLayerSubtreeHidden(child, hidden));
+                return;
+            }
+            const display = hidden ? 'none' : '';
+            if (layer._path) layer._path.style.display = display;
+            if (layer._icon) layer._icon.style.display = display;
+            if (layer._shadow) layer._shadow.style.display = display;
+        }
+
+        function setMarkerHidden(marker, hidden) {
+            if (!marker) return;
+            const display = hidden ? 'none' : '';
+            const wasHidden = marker._icon && marker._icon.style.display === 'none';
+            if (marker._icon) marker._icon.style.display = display;
+            if (marker._shadow) marker._shadow.style.display = display;
+            if (hidden) {
+                closeMarkerPopupAndTooltip(marker);
+            } else if (wasHidden && marker._zoomDirty && typeof marker.update === 'function') {
+                // Marker was hidden through one or more zooms — its DOM position is stale.
+                // Reposition before the user sees it. (See L.Marker.update patch below.)
+                marker._zoomDirty = false;
+                marker.update();
+            }
+        }
+
+        // Whenever any layer gets attached to the map, ensure no stale `display:none` from a
+        // prior hide leaks through. Without this, a checkbox-off-then-on sequence while a
+        // highlight is active would re-attach SVG paths still styled hidden, leaving the user
+        // with an "enabled" layer that's invisible. The listener fires once per top-level
+        // addLayer call, recurses through the layer's subtree, and clears the style — cheap
+        // because setting display='' on an already-empty value is a no-op write.
+        map.on('layeradd', function(e) {
+            if (e && e.layer) setLayerSubtreeHidden(e.layer, false);
+        });
+
+        // ─── Zoom optimizations ──────────────────────────────────────────────────────
+        //
+        // At zoomend, Leaflet reprojects every attached polyline and repositions every
+        // marker. With visibility-toggle highlights, "every attached" includes thousands of
+        // currently-invisible paths/markers — wasted work that makes zoom feel laggy.
+        //
+        // Strategy: short-circuit reprojection for hidden items by checking their `display`
+        // style. Mark them dirty so we know to reproject when they're un-hidden. The dirty
+        // flag flips back to false in setLayerSubtreeHidden / setMarkerHidden when going
+        // visible, with a one-shot _project()/_update() to bring them current.
+
+        // Polyline / Path reprojection skip. _project (latLng→pixel for every vertex) and
+        // _update (clip + setAttribute('d', …)) are the two hot operations on zoom. Skipping
+        // both for hidden paths saves the bulk of the cost.
+        const _origPathProject = L.Polyline.prototype._project;
+        const _origPathUpdate  = L.Polyline.prototype._update;
+        L.Polyline.prototype._project = function() {
+            if (this._path && this._path.style.display === 'none') {
+                this._zoomDirty = true;
+                return;
+            }
+            _origPathProject.call(this);
+        };
+        L.Polyline.prototype._update = function() {
+            if (this._path && this._path.style.display === 'none') return;
+            _origPathUpdate.call(this);
+        };
+
+        // Same idea for circle markers (stop dots). They have _path too.
+        if (L.CircleMarker && L.CircleMarker.prototype._project) {
+            const _origCircleProject = L.CircleMarker.prototype._project;
+            const _origCircleUpdate  = L.CircleMarker.prototype._update;
+            L.CircleMarker.prototype._project = function() {
+                if (this._path && this._path.style.display === 'none') {
+                    this._zoomDirty = true;
+                    return;
+                }
+                _origCircleProject.call(this);
+            };
+            L.CircleMarker.prototype._update = function() {
+                if (this._path && this._path.style.display === 'none') return;
+                _origCircleUpdate.call(this);
+            };
+        }
+
+        // Markers: skip update() (which calls latLngToLayerPoint + DOM transform) when hidden.
+        const _origMarkerUpdate = L.Marker.prototype.update;
+        L.Marker.prototype.update = function() {
+            if (this._icon && this._icon.style.display === 'none') {
+                this._zoomDirty = true;
+                return this;
+            }
+            return _origMarkerUpdate.call(this);
+        };
+
+        // Patch setLayerSubtreeHidden to clear `_zoomDirty` and force a one-shot reproject
+        // when a path transitions from hidden→visible. Wrapping the original keeps the
+        // recursion logic intact.
+        const _origSetLayerSubtreeHidden = setLayerSubtreeHidden;
+        setLayerSubtreeHidden = function(layer, hidden) {
+            if (!layer) return;
+            if (typeof layer.eachLayer === 'function') {
+                layer.eachLayer(child => setLayerSubtreeHidden(child, hidden));
+                return;
+            }
+            const wasHidden = (layer._path && layer._path.style.display === 'none')
+                           || (layer._icon && layer._icon.style.display === 'none');
+            _origSetLayerSubtreeHidden(layer, hidden);
+            if (wasHidden && !hidden && layer._zoomDirty) {
+                layer._zoomDirty = false;
+                if (typeof layer._project === 'function') layer._project();
+                if (typeof layer._update === 'function') layer._update();
+                if (typeof layer.update === 'function' && layer._icon) layer.update();
+            }
+        };
+
+        // Polyline render-time simplification. smoothFactor multiplies the screen-space
+        // tolerance Leaflet uses for Douglas-Peucker before drawing. 1.5 cuts ~30-40% of
+        // points at typical zoom levels with no visible quality loss for transit lines.
+        // Build-time simplification still runs (3m tolerance); this is on top of that.
+        L.Polyline.mergeOptions({ smoothFactor: 1.5 });
         
-        // Helper function: Hide everything except the specified lines
-        // options.layerKeyPrefix (e.g. 'mta-subway'): linesToShow are display names for that system only
-        function hideEverythingExcept(linesToShow, options) {
-            const prefix = options && options.layerKeyPrefix;
+        // Helper: hide everything except the specified items.
+        //
+        // `items` is a list of `{agency, line}` pairs:
+        //
+        //     hideEverythingExcept([{ agency: 'subway', line: '7' }, { agency: 'mbta', line: 'Red Line' }])
+        //
+        // Why scoped (`{agency, line}`) and not bare display names? Because some agencies share
+        // route names — MTA Subway "1" vs MBTA Bus "1" — and the layer/marker collections are
+        // disjoint per agency. Tagging each line with its agency lets us:
+        //   1. Compute the exact layer key (some agencies prefix, some don't — see AGENCIES table)
+        //   2. Re-show ONLY that agency's live markers for that line, never another agency's.
+        //
+        // The `items(agency, lines)` sugar at the top of the file makes call sites tidy:
+        //
+        //     hideEverythingExcept(items('lirr', lineNames))
+        // Generation counter: bumped whenever a new highlight begins, so any in-flight
+        // chunked restore from a previous un-highlight knows to abort itself.
+        let _highlightGeneration = 0;
+
+        function hideEverythingExcept(items) {
+            _highlightGeneration++;
+            // Build the precise set of layer keys to keep visible.
+            const showLayerKeys = new Set(items.map(layerKeyForItem));
+            // Loose set of display names (agency-agnostic) — used only for the combined-stations
+            // overlay, where the gold marker just needs to know "is any of this station's routes
+            // in the highlight set".
+            const showDisplayNames = new Set(items.map(i => i.line));
+
             Object.keys(layers).forEach(layerKey => {
-                const show = prefix
-                    ? (layerKey.startsWith(prefix + '-') && linesToShow.includes(displayNameFromLayerKey(layerKey)))
-                    : linesToShow.includes(layerKey);
-                if (!show) {
-                    if (layers[layerKey] && map.hasLayer(layers[layerKey])) map.removeLayer(layers[layerKey]);
-                } else {
-                    if (layers[layerKey] && !map.hasLayer(layers[layerKey])) map.addLayer(layers[layerKey]);
-                }
-            });
-            
-            // Hide all live markers (close popup/tooltip first so "Live A Train" etc. doesn't stay on screen)
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, busId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, silverId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, ferryId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            shoreLineEastMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            amtrakMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            hartfordLineMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            njTransitMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            septaMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Show only live markers for the highlighted lines
-            linesToShow.forEach(lineName => {
-                // Show Shore Line East markers if this is a Shore Line East line
-                if (shoreLineEastLines.includes(lineName)) {
-                    const showLive = isChecked('show-shore-line-east-live');
-                    if (showLive) {
-                        shoreLineEastMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
+                // Combined-stations is a UI overlay layer, not a transit line. Keep it on the
+                // map but dim individual gold markers whose station has no overlap with the
+                // current highlight set — otherwise Atlantic Terminal would glow during an
+                // Amtrak NEC highlight even though it's LIRR-only.
+                if (layerKey === 'combined-stations') {
+                    const layer = layers[layerKey];
+                    if (!layer) return;
+                    if (!map.hasLayer(layer)) map.addLayer(layer);
+                    layer.eachLayer(marker => {
+                        if (!marker._stationData) return;
+                        const stationRoutes = (marker._stationData.systems || [])
+                            .flatMap(sys => Array.isArray(sys.routes) ? sys.routes : []);
+                        const isRelevant = stationRoutes.some(r => showDisplayNames.has(r));
+                        marker.setStyle({
+                            opacity: isRelevant ? 1 : 0,
+                            fillOpacity: isRelevant ? 1 : 0
                         });
-                    }
+                    });
+                    return;
                 }
-                // Show Amtrak markers if this is an Amtrak line
-                if (amtrakLines.includes(lineName)) {
-                    const showLive = isChecked('show-amtrak-live');
-                    if (showLive) {
-                        amtrakMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
-                    }
+                // Strict layer-key match. mta-subway-7 ≠ mbta-bus-7, so highlighting subway "7"
+                // never accidentally unhides bus "7".
+                //
+                // Visibility-toggle (not detach/attach): if the layer is already on the map we
+                // flip its DOM `display` style instead of calling map.removeLayer/addLayer.
+                // That eliminates the per-frame pop-in on unhighlight — the entire restore is
+                // one paint instead of a cascade of attach operations across many rAF ticks.
+                // Layers not yet on the map (lazy-loaded routes) still go through addLayer.
+                const layer = layers[layerKey];
+                if (!layer) return;
+                const show = showLayerKeys.has(layerKey);
+                const onMap = map.hasLayer(layer);
+                if (show) {
+                    if (!onMap) map.addLayer(layer);
+                    setLayerSubtreeHidden(layer, false);
+                } else if (onMap) {
+                    setLayerSubtreeHidden(layer, true);
                 }
-                // Show Hartford Line markers if this is a Hartford Line line
-                if (hartfordLineLines.includes(lineName)) {
-                    const showLive = isChecked('show-hartford-line-live');
-                    if (showLive) {
-                        hartfordLineMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
-                    }
+            });
+
+            // Hide all live vehicle markers, using the MAP'S own layer list as the source of
+            // truth — not the agency-specific Maps. The Maps occasionally lose track of a
+            // marker (async race in a poll cycle, marker added before its Map.set, etc.), so
+            // a marker can sit on the map but be invisible to `mtaSubwayMarkers.forEach`.
+            // Iterating `map.eachLayer` instead catches every L.marker that's actually visible,
+            // regardless of which collection (or none) is tracking it. The previous approach
+            // is what caused the "lone 2 train" leftover after switching highlights.
+            const expectedRouteNames = new Set(items.map(i => i.line));
+            map.eachLayer(layer => {
+                // Only target live-vehicle markers — they're DOM-based L.Marker with a
+                // .routeName tag we set during creation. Stop markers (L.circleMarker) are
+                // owned by route layer-groups and were already handled above; tile and
+                // route-polyline layers don't have .routeName.
+                if (layer instanceof L.Marker && typeof layer.routeName === 'string' &&
+                    !expectedRouteNames.has(layer.routeName)) {
+                    setMarkerHidden(layer, true);
                 }
-                // Show LIRR markers if this is a LIRR line
-                if (lirrLines.includes(lineName)) {
-                    const showLive = isChecked('show-lirr-live');
-                    if (showLive) {
-                        lirrMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
-                    }
+            });
+
+            // Re-show the live markers for highlighted lines. We still iterate the agency
+            // Maps here (rather than reading from `map`) because some markers may have been
+            // hidden (display:none) by a prior highlight cycle — we need to un-hide them, and
+            // we need to find any that aren't yet attached to the map and addLayer them.
+            items.forEach(item => {
+                const agency = AGENCY_BY_KEY[item.agency];
+                if (!agency) return;
+                let liveCheckbox = agency.liveCheckbox;
+                // MBTA mixes subway/commuter/seasonal in trainMarkers and gates each by a separate
+                // live-tracking checkbox. The default 'show-subway-live' is right for subway lines,
+                // but commuter rail and seasonal need their own checkbox.
+                if (item.agency === 'mbta') {
+                    if (commuterLines.includes(item.line)) liveCheckbox = 'show-commuter-live';
+                    else if (seasonalLines.includes(item.line)) liveCheckbox = 'show-seasonal-live';
                 }
-                // Show Metro North markers if this is a Metro North line
-                if (metroNorthLines.includes(lineName)) {
-                    const showLive = isChecked('show-metro-north-live');
-                    if (showLive) {
-                        metroNorthMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
+                if (!isChecked(liveCheckbox)) return;
+                agency.getMarkers().forEach(marker => {
+                    if (marker && marker.routeName === item.line) {
+                        if (!map.hasLayer(marker)) marker.addTo(map);
+                        setMarkerHidden(marker, false);
                     }
-                }
-                // Show NJ Transit markers if this is an NJ Transit line
-                if (njTransitLines.includes(lineName)) {
-                    const showLive = isChecked('show-nj-transit-live');
-                    if (showLive) {
-                        njTransitMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
-                    }
-                }
-                // Show SEPTA markers if this is a SEPTA line
-                if (septaLines.includes(lineName)) {
-                    const showLive = isChecked('show-septa-live');
-                    if (showLive) {
-                        septaMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
-                    }
-                }
-                // Show MTA Subway markers if this is a MTA Subway line
-                if (mtaSubwayLines.includes(lineName)) {
-                    const showLive = isChecked('show-mta-subway-live');
-                    if (showLive) {
-                        let reAdded = 0;
-                        const reAddedRoutes = {};
-                        mtaSubwayMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                                reAdded++;
-                                reAddedRoutes[marker.routeName] = (reAddedRoutes[marker.routeName] || 0) + 1;
-                            }
-                        });
-                    }
-                }
-                // Show MBTA markers if this is an MBTA line
-                if (subwayLines.includes(lineName) || commuterLines.includes(lineName) || seasonalLines.includes(lineName)) {
-                    let showLive = false;
-                    if (subwayLines.includes(lineName)) {
-                        showLive = isChecked('show-subway-live');
-                    } else if (commuterLines.includes(lineName)) {
-                        showLive = isChecked('show-commuter-live');
-                    } else if (seasonalLines.includes(lineName)) {
-                        showLive = isChecked('show-seasonal-live');
-                    }
-                    if (showLive) {
-                        trainMarkers.forEach((marker, trainId) => {
-                            if (marker && marker.routeName === lineName && !map.hasLayer(marker)) {
-                                marker.addTo(map);
-                            }
-                        });
-                    }
-                }
+                });
             });
         }
         
         // Function to highlight multiple Shore Line East lines (for multi-line stops)
         function highlightMultipleShoreLineEastLines(lineNames) {
             highlightedShoreLineEastLine = lineNames;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            
-            // Ensure routes are loaded before highlighting
+            clearAllHighlightStateExcept('shoreLineEast');
             if (!shoreLineEastRoutesLoaded && !shoreLineEastRoutesLoading) {
                 loadShoreLineEastRoutes(true);
             }
-            
-            hideEverythingExcept(lineNames);
-            updateAllMarkerVisibility(); // Update marker visibility immediately
+            hideEverythingExcept(items('shoreLineEast', lineNames));
+            updateAllMarkerVisibility();
         }
-        
+
         // Function to highlight a specific Shore Line East line
         function highlightShoreLineEastLine(lineName) {
-            
             highlightedShoreLineEastLine = lineName;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            
-            // Ensure routes are loaded before highlighting
+            clearAllHighlightStateExcept('shoreLineEast');
             if (!shoreLineEastRoutesLoaded && !shoreLineEastRoutesLoading) {
                 loadShoreLineEastRoutes(true);
             }
-            
-            hideEverythingExcept([lineName]);
-            updateAllMarkerVisibility(); // Update marker visibility immediately
+            hideEverythingExcept(items('shoreLineEast', lineName));
+            updateAllMarkerVisibility();
         }
         
         // Single source of truth: should this route layer be visible when no highlight is active?
@@ -5485,33 +5516,44 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Single place to clear all highlight state (used by every unhighlight path)
         function clearAllHighlightState() {
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedNJTransitLine = null;
-            highlightedSEPTALine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            highlightedCombinedStation = null;
+            clearAllHighlightStateExcept(null);  // null is no agency, so every var gets nulled
         }
         
         // Restore map to "no highlight" state using checkboxes only (single source of truth).
         // Never depends on a snapshot, so Escape / same-stop unclick always restores correctly.
+        //
+        // Performance: re-attaching ~150 layer-groups synchronously cascades to ~9000 SVG path
+        // insertions, which previously blocked the main thread for ~800ms. We split the work:
+        // the cheap parts (removals, marker visibility, combined-station opacity) run inline so
+        // the user sees an immediate visual response; the expensive `addLayer` cascade for
+        // route polylines/stops is chunked across animation frames so the UI stays interactive.
+        // A generation counter (`_highlightGeneration`) lets a new highlight click cancel any
+        // in-flight chunked restore mid-stream.
         function restoreAllLayersAndMarkers() {
-            // Layers: add/remove by checkbox only
+            const myGen = ++_highlightGeneration;
+
+            // Restore is now a single-frame visibility toggle for everything already on the
+            // map — no detach/reattach. Items that are attached but hidden flip their `display`
+            // style back to '' (paints in one frame, "all at once"). Items that aren't attached
+            // yet (rare — only lazy-loaded layers like Amtrak before its first reveal, or live
+            // markers that were never added because their checkbox was off at creation time)
+            // go into a small add-queue that drains async. The generation guard still cancels
+            // a stale restore if a new highlight click fires mid-stream.
+            const addQueue = [];
+
             Object.keys(layers).forEach(layerName => {
                 const layer = layers[layerName];
                 if (!layer) return;
                 const shouldShow = shouldShowLayerWhenNoHighlight(layerName);
-                if (shouldShow && !map.hasLayer(layer)) {
-                    map.addLayer(layer);
-                } else if (!shouldShow && map.hasLayer(layer)) {
-                    map.removeLayer(layer);
+                const onMap = map.hasLayer(layer);
+                if (shouldShow) {
+                    if (onMap) setLayerSubtreeHidden(layer, false);
+                    else addQueue.push(layer);
+                } else if (onMap) {
+                    setLayerSubtreeHidden(layer, true);
                 }
             });
-            
+
             // Bus stop layers: show if bus paths on, zoom sufficient, and route layer is visible
             const busPathsOn = isChecked('show-bus-paths');
             const zoomSufficient = map.getZoom() >= BUS_STOPS_MIN_ZOOM;
@@ -5519,147 +5561,69 @@ document.addEventListener('DOMContentLoaded', function() {
                 const busLayerKey = layerKeyForSystem('mbta-bus', layerName);
                 const routeLayerVisible = layers[busLayerKey] && map.hasLayer(layers[busLayerKey]);
                 const shouldShow = busPathsOn && zoomSufficient && routeLayerVisible;
-                if (shouldShow && !map.hasLayer(layer)) {
-                    layer.addTo(map);
-                } else if (!shouldShow && map.hasLayer(layer)) {
-                    map.removeLayer(layer);
+                const onMap = map.hasLayer(layer);
+                if (shouldShow) {
+                    if (onMap) setLayerSubtreeHidden(layer, false);
+                    else addQueue.push(layer);
+                } else if (onMap) {
+                    setLayerSubtreeHidden(layer, true);
                 }
             });
-            
-            // Restore all markers based on checkboxes
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && marker.routeName) {
-                    let shouldShow = false;
-                    if (subwayLines.includes(marker.routeName)) {
-                        shouldShow = isChecked('show-subway-live');
-                    } else if (commuterLines.includes(marker.routeName)) {
-                        shouldShow = isChecked('show-commuter-live');
-                    } else if (seasonalLines.includes(marker.routeName)) {
-                        shouldShow = isChecked('show-seasonal-live');
-                    }
-                    if (shouldShow && !map.hasLayer(marker)) {
-                        marker.addTo(map);
-                    } else if (!shouldShow && map.hasLayer(marker)) {
-                        map.removeLayer(marker);
-                    }
+
+            function reconcileMarker(marker, shouldShow) {
+                if (!marker) return;
+                const onMap = map.hasLayer(marker);
+                if (shouldShow) {
+                    if (onMap) setMarkerHidden(marker, false);
+                    else addQueue.push(marker);
+                } else if (onMap) {
+                    setMarkerHidden(marker, true);
                 }
+            }
+
+            trainMarkers.forEach(marker => {
+                if (!marker || !marker.routeName) return;
+                let shouldShow = false;
+                if (subwayLines.includes(marker.routeName)) shouldShow = isChecked('show-subway-live');
+                else if (commuterLines.includes(marker.routeName)) shouldShow = isChecked('show-commuter-live');
+                else if (seasonalLines.includes(marker.routeName)) shouldShow = isChecked('show-seasonal-live');
+                reconcileMarker(marker, shouldShow);
             });
-            
-            busMarkers.forEach((marker, busId) => {
-                const shouldShow = isChecked('show-bus-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                const shouldShow = isChecked('show-shuttle-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            silverLineMarkers.forEach((marker, silverId) => {
-                const shouldShow = isChecked('show-silver-line-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            ferryMarkers.forEach((marker, ferryId) => {
-                const shouldShow = isChecked('show-ferry-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            lirrMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-lirr-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            metroNorthMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-metro-north-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                const shouldShow = shouldShowMarker('subway', marker.routeName, 'show-mta-subway-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    closeMarkerPopupAndTooltip(marker);
-                    map.removeLayer(marker);
-                }
-            });
-            
-            shoreLineEastMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-shore-line-east-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            amtrakMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-amtrak-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            hartfordLineMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-hartford-line-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            njTransitMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-nj-transit-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            septaMarkers.forEach((marker, trainId) => {
-                const shouldShow = isChecked('show-septa-live');
-                if (shouldShow && marker && !map.hasLayer(marker)) {
-                    marker.addTo(map);
-                } else if (!shouldShow && marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Restore all combined station markers to full opacity
+            busMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-bus-live')));
+            shuttleMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-shuttle-live')));
+            silverLineMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-silver-line-live')));
+            ferryMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-ferry-live')));
+            lirrMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-lirr-live')));
+            metroNorthMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-metro-north-live')));
+            mtaSubwayMarkers.forEach(marker => reconcileMarker(marker, shouldShowMarker('subway', marker.routeName, 'show-mta-subway-live')));
+            shoreLineEastMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-shore-line-east-live')));
+            amtrakMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-amtrak-live')));
+            hartfordLineMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-hartford-line-live')));
+            njTransitMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-nj-transit-live')));
+            septaMarkers.forEach(marker => reconcileMarker(marker, isChecked('show-septa-live')));
+
+            // Restore all combined station markers to full opacity (cheap — DOM attribute set).
             if (layers['combined-stations']) {
                 layers['combined-stations'].eachLayer(marker => {
                     marker.setStyle({ opacity: 1, fillOpacity: 1 });
                 });
             }
+
+            // Drain any first-time attaches async so a huge initial batch (e.g., first reveal
+            // of Amtrak's ~1000 stops) doesn't block. In steady state this queue is empty.
+            if (addQueue.length === 0) return;
+            const FRAME_BUDGET_MS = 6;
+            let cursor = 0;
+            function drain() {
+                if (myGen !== _highlightGeneration) return;
+                const deadline = performance.now() + FRAME_BUDGET_MS;
+                while (cursor < addQueue.length && performance.now() < deadline) {
+                    const item = addQueue[cursor++];
+                    if (item && !map.hasLayer(item)) map.addLayer(item);
+                }
+                if (cursor < addQueue.length) requestAnimationFrame(drain);
+            }
+            requestAnimationFrame(drain);
         }
         
         // Function to reset Shore Line East highlighting (unified path: clear + restore)
@@ -5671,7 +5635,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Function to get ALL connecting lines from connections array (all systems)
         function getConnectingLines(connections) {
             if (!connections || connections.length === 0) return [];
-            
+
             const allLines = [];
             connections.forEach(conn => {
                 if (!allLines.includes(conn.lineName)) {
@@ -5680,7 +5644,42 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             return allLines;
         }
-        
+
+        // Map the system tags emitted by findAllConnections() onto the agency keys used by
+        // hideEverythingExcept's items[]. This is what lets a connection from "Amtrak NEC"
+        // to the Metro-North Hudson Line resolve to layer key 'Hudson Line', and a connection
+        // from MTA Subway 7 (display "7") resolve to 'mta-subway-7' instead of clashing with
+        // MBTA bus 7. mbta_bus / mbta_silver / mbta_ferry are intentionally omitted: their
+        // marker/layer wiring isn't first-class in AGENCIES, and connections to those modes
+        // are rare; if they become important, add the agencies and uncomment.
+        const CONNECTION_SYSTEM_TO_AGENCY = {
+            'mbta_subway':     'mbta',
+            'mbta_commuter':   'mbta',
+            'lirr':            'lirr',
+            'metro_north':     'metroNorth',
+            'mta_subway':      'subway',
+            'shore_line_east': 'shoreLineEast',
+            'hartford_line':   'hartfordLine',
+            'amtrak':          'amtrak'
+        };
+
+        // Convert a connections[] array (from findAllConnections) into agency-scoped items
+        // for hideEverythingExcept. De-duplicates so the same (agency, line) pair only shows up once.
+        function connectionsToItems(connections) {
+            if (!Array.isArray(connections) || connections.length === 0) return [];
+            const result = [];
+            const seen = new Set();
+            connections.forEach(conn => {
+                const agency = CONNECTION_SYSTEM_TO_AGENCY[conn.system];
+                if (!agency) return;
+                const key = agency + '|' + conn.lineName;
+                if (seen.has(key)) return;
+                seen.add(key);
+                result.push({ agency, line: conn.lineName });
+            });
+            return result;
+        }
+
         // Backwards compatibility - MBTA only
         function getConnectingMBTALines(connections) {
             if (!connections || connections.length === 0) return [];
@@ -5720,92 +5719,46 @@ document.addEventListener('DOMContentLoaded', function() {
             return mbtaLines;
         }
         
-        // Function to highlight multiple Amtrak lines (for multi-line stops)
+        // Amtrak is special: it has a "connections" feature that intentionally co-highlights
+        // connecting MBTA lines (so e.g. clicking the Northeast Regional also lights up the
+        // Providence/Stoughton line at shared stops). After clearing all other agency state,
+        // we re-set highlightedLine for the connecting MBTA lines.
         function highlightMultipleAmtrakLines(lineNames, connections = []) {
             highlightedAmtrakLine = lineNames;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedHartfordLineLine = null;
-            
-            // Ensure Amtrak routes are loaded before highlighting
+            clearAllHighlightStateExcept('amtrak');
             if (!amtrakRoutesLoaded && !amtrakRoutesLoading) {
                 loadAmtrakRoutes(true);
-            } else if (amtrakRoutesLoaded) {
-                // Make sure all Amtrak lines are shown
-                lineNames.forEach(lineName => {
-                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                        map.addLayer(layers[lineName]);
-                    }
-                });
             }
-            
-            // Get ALL connecting lines (from all systems)
-            const connectingLines = getConnectingLines(connections);
+            // connectionsToItems agency-tags every connection (subway, MN, LIRR, etc.) so each
+            // routes to the right layer key — no more loose-match collisions.
+            hideEverythingExcept([
+                ...items('amtrak', lineNames),
+                ...connectionsToItems(connections)
+            ]);
             const connectingMBTALines = getConnectingMBTALines(connections);
-            
-            // Hide everything except Amtrak lines AND all connecting lines
-            const allLinesToShow = [...lineNames, ...connectingLines];
-            hideEverythingExcept(allLinesToShow);
-            
-            // Set highlightedLine for connecting MBTA lines (for marker visibility)
             if (connectingMBTALines.length > 0) {
-                if (connectingMBTALines.length === 1) {
-                    highlightedLine = connectingMBTALines[0];
-                } else {
-                    highlightedLine = connectingMBTALines;
-                }
-            } else {
-                highlightedLine = null;
+                highlightedLine = connectingMBTALines.length === 1 ? connectingMBTALines[0] : connectingMBTALines;
             }
-            
-            updateAllMarkerVisibility(); // Update marker visibility immediately
+            updateAllMarkerVisibility();
         }
-        
+
         // Function to highlight a specific Amtrak line
         function highlightAmtrakLine(lineName, connections = []) {
             highlightedAmtrakLine = lineName;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedHartfordLineLine = null;
-            
-            // CRITICAL: Ensure Amtrak routes are loaded and shown
+            clearAllHighlightStateExcept('amtrak');
             if (!amtrakRoutesLoaded && !amtrakRoutesLoading) {
                 loadAmtrakRoutes(true);
-                // Wait a bit for routes to load, then continue
-                setTimeout(() => {
-                    highlightAmtrakLine(lineName, connections);
-                }, 100);
+                setTimeout(() => highlightAmtrakLine(lineName, connections), 100);
                 return;
             }
-            
-            // Get ALL connecting lines (from all systems)
-            const connectingLines = getConnectingLines(connections);
+            hideEverythingExcept([
+                ...items('amtrak', lineName),
+                ...connectionsToItems(connections)
+            ]);
             const connectingMBTALines = getConnectingMBTALines(connections);
-            
-            // Build list of all lines to show: Amtrak line(s) + all connecting lines
-            const allLinesToShow = [lineName, ...connectingLines];
-            hideEverythingExcept(allLinesToShow);
-            
-            // Make sure the Amtrak line layer is on the map
-            if (layers[lineName]) {
-                if (!map.hasLayer(layers[lineName])) map.addLayer(layers[lineName]);
-            }
-            
-            // Set highlightedLine for connecting MBTA lines (for marker visibility)
             if (connectingMBTALines.length > 0) {
-                if (connectingMBTALines.length === 1) {
-                    highlightedLine = connectingMBTALines[0];
-                } else {
-                    highlightedLine = connectingMBTALines;
-                }
-            } else {
-                highlightedLine = null;
+                highlightedLine = connectingMBTALines.length === 1 ? connectingMBTALines[0] : connectingMBTALines;
             }
-            
             updateAllMarkerVisibility();
         }
         
@@ -5818,180 +5771,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // Function to highlight multiple Hartford Line lines (for multi-line stops)
         function highlightMultipleHartfordLineLines(lineNames) {
             highlightedHartfordLineLine = lineNames;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            
-            lineNames.forEach(lineName => {
-                if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                    map.addLayer(layers[lineName]);
-                }
-            });
-            
-            hartfordLineLines.forEach(layerName => {
-                if (!lineNames.includes(layerName)) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            Object.keys(layers).forEach(layerName => {
-                if (!lineNames.includes(layerName) && !hartfordLineLines.includes(layerName)) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            // Hide all live train markers from other systems
-            // Hide LIRR markers
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide Metro North markers
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide MTA Subway markers
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide Shore Line East markers
-            shoreLineEastMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide MBTA live vehicle markers
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, busId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, silverId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, ferryId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            updateAllMarkerVisibility(); // Update marker visibility immediately to prevent refresh issues
+            clearAllHighlightStateExcept('hartfordLine');
+            hideEverythingExcept(items('hartfordLine', lineNames));
+            updateAllMarkerVisibility();
         }
-        
+
         // Function to highlight a specific Hartford Line line
         function highlightHartfordLineLine(lineName) {
-            
             highlightedHartfordLineLine = lineName;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedSubwayLine = null;
-            highlightedShoreLineEastLine = null;
-            
-            if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                map.addLayer(layers[lineName]);
-            }
-            
-            hartfordLineLines.forEach(layerName => {
-                if (layerName !== lineName) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            Object.keys(layers).forEach(layerName => {
-                if (layerName !== lineName && !hartfordLineLines.includes(layerName)) {
-                    if (layers[layerName] && map.hasLayer(layers[layerName])) {
-                        map.removeLayer(layers[layerName]);
-                    }
-                }
-            });
-            
-            // Hide all live train markers from other systems
-            // Hide LIRR markers
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide Metro North markers
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide MTA Subway markers
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide Shore Line East markers
-            shoreLineEastMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide MBTA live vehicle markers
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, busId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, silverId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, ferryId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            updateAllMarkerVisibility(); // Update marker visibility immediately to prevent refresh issues
+            clearAllHighlightStateExcept('hartfordLine');
+            hideEverythingExcept(items('hartfordLine', lineName));
+            updateAllMarkerVisibility();
         }
         
         // Function to reset Hartford Line highlighting (unified path: clear + restore)
@@ -6000,224 +5790,23 @@ document.addEventListener('DOMContentLoaded', function() {
             restoreAllLayersAndMarkers();
         }
         
-        // Function to highlight multiple subway lines (for multi-line stations)
-        function highlightMultipleSubwayLines(lineNames) {
-            highlightedSubwayLine = lineNames;
-            highlightedLine = null; // Clear MBTA highlighting
-            highlightedLIRRLine = null; // Clear LIRR highlighting
-            highlightedMetroNorthLine = null; // Clear Metro North highlighting
-            highlightedShoreLineEastLine = null; // Clear Shore Line East highlighting
-            highlightedAmtrakLine = null; // Clear Amtrak highlighting
-            highlightedHartfordLineLine = null; // Clear Hartford Line highlighting
-            
-            // Remove all dimmed subway layers from map, keep highlighted ones
-            mtaSubwayLines.forEach(lineName => {
-                const isDimmed = !lineNames.includes(lineName);
-                
-                if (isDimmed) {
-                    // Remove dimmed layer from map
-                    if (layers[lineName] && map.hasLayer(layers[lineName])) {
-                        map.removeLayer(layers[lineName]);
-                    }
-                } else {
-                    // Ensure highlighted layer is on map
-                    if (layers[lineName] && !map.hasLayer(layers[lineName])) {
-                        map.addLayer(layers[lineName]);
-                    }
-                }
-            });
-            
-            // Hide all non–MTA-subway layers when highlighting subway
-            Object.keys(layers).forEach(layerKey => {
-                if (!layerKey.startsWith('mta-subway-')) {
-                    if (layers[layerKey] && map.hasLayer(layers[layerKey])) map.removeLayer(layers[layerKey]);
-                }
-            });
-            
-            // Hide all MBTA bus stop layers
-            busStopLayers.forEach((layer, layerName) => {
-                if (map.hasLayer(layer)) {
-                    map.removeLayer(layer);
-                }
-            });
-            
-            // Remove all other live vehicle markers
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, busId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, silverId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, ferryId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide MTA subway trains that don't match the highlighted lines
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker) {
-                    // Extract route ID from trainId (format: "routeId_tripId")
-                    const routeId = trainId.split('_')[0];
-                    if (!lineNames.includes(routeId)) {
-                        // Hide trains from other routes
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                        }
-                    } else {
-                        // Show trains from the highlighted routes
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
-                    }
-                }
-            });
-        }
-        
-        // Function to highlight a specific subway line and dim all others
-        // Function to highlight a specific subway line and dim all others (REBUILT FROM SCRATCH - FOLLOWING LIRR PATTERN)
+        // Function to highlight a specific MTA Subway line. Subway uses prefixed layer keys
+        // (mta-subway-1, mta-subway-A); the {agency: 'subway'} tag tells hideEverythingExcept
+        // to apply that prefix automatically, so we never confuse subway "1" with bus "1".
         function highlightSubwayLine(lineName) {
             highlightedSubwayLine = lineName;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            
-            // Ensure subway routes are loaded before highlighting
+            clearAllHighlightStateExcept('subway');
             if (!subwayRoutesLoaded && !subwayRoutesLoading) {
                 loadMTASubwayRoutes(true);
             }
-            
-            hideEverythingExcept([lineName], { layerKeyPrefix: 'mta-subway' });
-            
-            // Remove dimmed layers from map or show highlighted one (use prefixed layer keys)
-            mtaSubwayLines.forEach(displayName => {
-                const layerKey = layerKeyForSystem('mta-subway', displayName);
-                const isDimmed = displayName !== lineName;
-                if (isDimmed) {
-                    if (layers[layerKey] && map.hasLayer(layers[layerKey])) map.removeLayer(layers[layerKey]);
-                } else {
-                    if (layers[layerKey]) {
-                        const hasContent = layers[layerKey].getLayers().length > 0;
-                        if (hasContent && !map.hasLayer(layers[layerKey])) map.addLayer(layers[layerKey]);
-                    }
-                }
-            });
-            
-            // Hide all non–MTA-subway layers when highlighting subway
-            Object.keys(layers).forEach(layerKey => {
-                if (!layerKey.startsWith('mta-subway-')) {
-                    if (layers[layerKey] && map.hasLayer(layers[layerKey])) map.removeLayer(layers[layerKey]);
-                }
-            });
-            
-            // Hide all MBTA bus stop layers
-            busStopLayers.forEach((layer, layerName) => {
-                if (map.hasLayer(layer)) {
-                    map.removeLayer(layer);
-                }
-            });
-            
-            // Remove all other live vehicle markers
-            trainMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, busId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, shuttleId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, silverId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, ferryId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            lirrMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            metroNorthMarkers.forEach((marker, trainId) => {
-                if (marker && map.hasLayer(marker)) {
-                    map.removeLayer(marker);
-                }
-            });
-            
-            // Hide MTA subway trains that don't match the highlighted line
-            let removedCount = 0;
-            let shownCount = 0;
-            const routeIdsOnMap = [];
-            mtaSubwayMarkers.forEach((marker, trainId) => {
-                if (marker) {
-                    // Extract route ID from trainId (format: "routeId_tripId")
-                    const routeId = trainId.split('_')[0];
-                    if (routeId !== lineName) {
-                        // Hide trains from other routes
-                        if (map.hasLayer(marker)) {
-                            map.removeLayer(marker);
-                            removedCount++;
-                        }
-                    } else {
-                        // Show trains from the highlighted route
-                        if (!map.hasLayer(marker)) {
-                            marker.addTo(map);
-                        }
-                        if (map.hasLayer(marker)) shownCount++;
-                    }
-                    if (map.hasLayer(marker)) routeIdsOnMap.push(routeId);
-                }
-            });
+            hideEverythingExcept(items('subway', lineName));
         }
-        
+
         // Function to highlight multiple subway lines (for multi-line stations)
         function highlightMultipleSubwayLines(lineNames) {
             highlightedSubwayLine = lineNames;
-            highlightedLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedAmtrakLine = null;
-            highlightedHartfordLineLine = null;
-            
-            hideEverythingExcept(lineNames, { layerKeyPrefix: 'mta-subway' });
+            clearAllHighlightStateExcept('subway');
+            hideEverythingExcept(items('subway', lineNames));
         }
         
         // Function to reset subway highlighting (unified path: clear + restore)
@@ -6227,102 +5816,77 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Unified highlight function for multi-system stations
+        // Combined-station highlight = "act as a superset of the station's subsidiary stops".
+        // Clicking South Station should be equivalent to clicking the Red Line stop AND the
+        // Silver Line stop AND the Providence Line stop AND the Amtrak NEC stop, all at once.
+        //
+        // We set each affected agency's highlight var to the list of THAT agency's routes that
+        // pass through this station, then route through `hideEverythingExcept` for uniform layer
+        // and live-marker cleanup. This way the next agency polls (Amtrak / NJT / etc.) hide
+        // their own markers correctly — the per-agency `shouldShowMarker` check will see that
+        // its agency IS highlighted (with a route array) and re-show only the matching trains.
+        // Maps the human-readable `system` field in combined-stations.json to the agency key
+        // used by AGENCIES / hideEverythingExcept. The `assign` half writes the per-agency
+        // highlight state var (so subsequent live-tracker polls dim/show correctly). The
+        // `agencyKey` half tells `hideEverythingExcept` which agency the routes belong to,
+        // so subway "1" maps to layer key `mta-subway-1` and never collides with bus "1".
+        const COMBINED_STATION_SYSTEM_TO_AGENCY = {
+            'MBTA':            { agencyKey: 'mbta',          assign: (lines) => { highlightedLine = lines; } },
+            'Amtrak':          { agencyKey: 'amtrak',        assign: (lines) => { highlightedAmtrakLine = lines; } },
+            'LIRR':            { agencyKey: 'lirr',          assign: (lines) => { highlightedLIRRLine = lines; } },
+            'MTA Subway':      { agencyKey: 'subway',        assign: (lines) => { highlightedSubwayLine = lines; } },
+            'NJ Transit':      { agencyKey: 'njTransit',     assign: (lines) => { highlightedNJTransitLine = lines; } },
+            'Metro North':     { agencyKey: 'metroNorth',    assign: (lines) => { highlightedMetroNorthLine = lines; } },
+            'SEPTA':           { agencyKey: 'septa',         assign: (lines) => { highlightedSEPTALine = lines; } },
+            'Hartford Line':   { agencyKey: 'hartfordLine',  assign: (lines) => { highlightedHartfordLineLine = lines; } },
+            'Shore Line East': { agencyKey: 'shoreLineEast', assign: (lines) => { highlightedShoreLineEastLine = lines; } }
+        };
+
         function highlightCombinedStation(station) {
-            
             // Toggle off if same station clicked again
             if (highlightedCombinedStation === station.name) {
                 resetAllHighlights();
                 return;
             }
-            
-            // Reset all existing highlights first (but preserve saved state)
-            highlightedLine = null;
-            highlightedAmtrakLine = null;
-            highlightedLIRRLine = null;
-            highlightedMetroNorthLine = null;
-            highlightedShoreLineEastLine = null;
-            highlightedHartfordLineLine = null;
-            highlightedSubwayLine = null;
-            highlightedCombinedStation = null;
-            
+
+            // Start from a clean slate.
+            clearAllHighlightStateExcept(null);
+
+            // Distribute this station's routes to each agency's highlight var, and build a
+            // properly-scoped item list for hideEverythingExcept.
+            const itemList = [];
+            (station.systems || []).forEach(sys => {
+                if (!sys || !Array.isArray(sys.routes)) return;
+                const mapping = COMBINED_STATION_SYSTEM_TO_AGENCY[sys.system];
+                if (!mapping) return;
+                mapping.assign(sys.routes.slice());
+                sys.routes.forEach(route => {
+                    itemList.push({ agency: mapping.agencyKey, line: route });
+                });
+            });
+
             highlightedCombinedStation = station.name;
-            
-            // Collect all routes to highlight
-            const routesToHighlight = new Set();
-            station.systems.forEach(sys => {
-                if (sys.routes) {
-                    sys.routes.forEach(route => routesToHighlight.add(route));
-                }
-            });
-            
-            // Remove non-highlighted layers, show highlighted ones (matching other highlight functions)
-            Object.keys(layers).forEach(layerName => {
-                const layer = layers[layerName];
-                if (!layer) return;
-                
-                if (routesToHighlight.has(layerName)) {
-                    // Show highlighted routes
-                    if (!map.hasLayer(layer)) {
-                        map.addLayer(layer);
-                    }
-                } else if (layerName === 'combined-stations') {
-                    // Hide other combined stations, keep only the selected one
-                    layer.eachLayer(marker => {
-                        if (marker._stationData && marker._stationData.name !== station.name) {
-                            marker.setStyle({ opacity: 0, fillOpacity: 0 });
-                        } else {
-                            marker.setStyle({ opacity: 1, fillOpacity: 1 });
-                        }
+
+            // Tag every route with its agency. hideEverythingExcept then resolves each to the
+            // exact layer key (e.g. 'mta-subway-7' for the subway 7), so highlighting Flushing
+            // Main Street shows the 7 train tracks AND its live trains — no more namespace
+            // mismatch — and never accidentally unhides MBTA bus "1" when subway "1" is in the set.
+            hideEverythingExcept(itemList);
+
+            // The combined-stations overlay layer itself stays visible (per the special case in
+            // hideEverythingExcept), but we dim every gold marker except the one that was clicked
+            // so the user clearly sees which station they selected.
+            const combinedLayer = layers['combined-stations'];
+            if (combinedLayer) {
+                combinedLayer.eachLayer(marker => {
+                    if (!marker._stationData) return;
+                    const isSelected = marker._stationData.name === station.name;
+                    marker.setStyle({
+                        opacity: isSelected ? 1 : 0,
+                        fillOpacity: isSelected ? 1 : 0
                     });
-                } else {
-                    // Remove non-highlighted routes from map
-                    if (map.hasLayer(layer)) {
-                        map.removeLayer(layer);
-                    }
-                }
-            });
-            
-            // Selectively remove live markers - keep ones for highlighted routes
-            trainMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            busMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            shuttleMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            silverLineMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            ferryMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            lirrMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            metroNorthMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
-            mtaSubwayMarkers.forEach((marker, id) => {
-                if (marker && marker.routeName && !routesToHighlight.has(String(marker.routeName))) {
-                    if (map.hasLayer(marker)) map.removeLayer(marker);
-                }
-            });
+                });
+            }
         }
         
         // Reset all highlights from all systems (single path: clear + restore)
@@ -6402,12 +5966,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to fetch live train positions
         async function fetchLiveTrains() {
+            if (!_pageVisible) return;
             try {
                 const now = Date.now();
                 if (now - lastUpdateTime < 5000) { // Rate limit: 5 seconds
                     return;
                 }
-                
+
                 const response = await fetch('https://api-v3.mbta.com/vehicles?filter[route_type]=0,1,2&include=route,trip');
                 
                 if (!response.ok) {
@@ -6428,12 +5993,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to fetch live bus positions
         async function fetchLiveBuses() {
+            if (!_pageVisible) return;
             try {
                 const now = Date.now();
                 if (now - lastBusUpdateTime < 5000) { // Rate limit: 5 seconds
                     return;
                 }
-                
+
                 const response = await fetch('https://api-v3.mbta.com/vehicles?filter[route_type]=3&include=route');
                 
                 if (!response.ok) {
@@ -6454,12 +6020,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to fetch live ferry positions
         async function fetchLiveFerries() {
+            if (!_pageVisible) return;
             try {
                 const now = Date.now();
                 if (now - lastUpdateTime < 5000) { // Rate limit: 5 seconds
                     return;
                 }
-                
+
                 const response = await fetch('https://api-v3.mbta.com/vehicles?filter[route_type]=4&include=route');
                 
                 if (!response.ok) {
@@ -7303,9 +6870,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to fetch live Metro North trains from MTA GTFS-RT API
         async function fetchMetroNorthTrains() {
+            if (!_pageVisible) return;
             // Note: MTA feeds are now free and don't require API keys!
             // Source: https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs-mnr
-            
+
             try {
                 const now = Date.now();
                 
@@ -7327,11 +6895,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 const buffer = await response.arrayBuffer();
-                
-                // Load GTFS-RT proto definition (use local file to avoid GitHub Pages URL resolution issues)
-                const root = await protobuf.load('./gtfs-realtime.proto');
+
+                // Load GTFS-RT proto definition (cached across all agencies — see getGtfsRealtimeProto)
+                const root = await getGtfsRealtimeProto();
                 const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
-                
+
                 // Decode the protobuf
                 const feed = FeedMessage.decode(new Uint8Array(buffer));
                 
@@ -7748,6 +7316,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to fetch live MTA Subway trains from GTFS-RT API
         async function fetchMtaSubwayTrains() {
+            if (!_pageVisible) return;
             // MTA Subway GTFS-RT feed URLs (no API key needed!)
             // Note: MTA has separate feeds for different line groups
             // Note: Subway feeds use TripUpdate entities, not VehiclePosition (no lat/lon)
@@ -7776,26 +7345,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 lastMtaSubwayUpdateTime = now;
-                
-                // Load GTFS-RT proto definition (once, reused for all feeds)
-                // Cache the protobuf root to avoid reloading
+
+                // Load GTFS-RT proto definition once and cache across all agencies (see getGtfsRealtimeProto).
                 if (!window.mtaSubwayProtobufRoot) {
                     try {
-                        // Try to determine the correct path for the proto file
-                        // On GitHub Pages, if repo is not username.github.io, base path includes repo name
-                        let protoPath = './gtfs-realtime.proto';
-                        const pathname = window.location.pathname;
-                        // If pathname is like /reponame/ or /reponame/index.html, use that base
-                        if (pathname !== '/' && pathname !== '/index.html') {
-                            const pathParts = pathname.split('/').filter(p => p);
-                            if (pathParts.length > 0 && pathParts[pathParts.length - 1] === 'index.html') {
-                                pathParts.pop(); // Remove index.html
-                            }
-                            if (pathParts.length > 0) {
-                                protoPath = '/' + pathParts.join('/') + '/gtfs-realtime.proto';
-                            }
-                        }
-                        window.mtaSubwayProtobufRoot = await protobuf.load(protoPath);
+                        window.mtaSubwayProtobufRoot = await getGtfsRealtimeProto();
                     } catch (error) {
                         console.error('❌ Error loading GTFS-RT proto file:', error);
                         console.error('Current pathname:', window.location.pathname);
@@ -8797,57 +8351,87 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to fetch live LIRR trains from MTA GTFS-RT API
         async function fetchLIRRTrains() {
+            if (!_pageVisible) return;
             // Note: MTA feeds are now free and don't require API keys!
             // Source: https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr
-            
+
             try {
                 const now = Date.now();
-                
+
                 // Rate limiting - don't update more than once every 5 seconds
                 if (now - lastLIRRUpdateTime < 5000) {
                     return;
                 }
-                
+
                 lastLIRRUpdateTime = now;
-                
+
                 // MTA LIRR GTFS-RT feed URL (no API key needed!)
                 const LIRR_GTFS_RT_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr';
-                
+
                 // Fetch the GTFS-RT feed
                 const response = await fetch(LIRR_GTFS_RT_URL);
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
+
                 const buffer = await response.arrayBuffer();
-                
-                // Load GTFS-RT proto definition (use local file to avoid GitHub Pages URL resolution issues)
-                const root = await protobuf.load('./gtfs-realtime.proto');
+
+                // Load GTFS-RT proto definition (cached across all agencies — see getGtfsRealtimeProto)
+                const root = await getGtfsRealtimeProto();
                 const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
-                
+
                 // Decode the protobuf
                 const feed = FeedMessage.decode(new Uint8Array(buffer));
-                
-                // Extract vehicle positions
+
+                // ─────────────────────────────────────────────────────────────────────
+                // The LIRR feed splits each train across TWO entities: one carries the
+                // TripUpdate (with trip.route_id populated and a stable trip_id like
+                // "GO104_26_786"), the other carries the VehiclePosition (with the
+                // lat/lon, but trip.route_id often missing — only trip_id is set).
+                //
+                // Without cross-referencing, route resolution falls through every path
+                // and every marker gets routeName = "LIRR Train"/"Trip <id>", which then
+                // fails shouldShowMarker on the next poll (because the highlight set is
+                // a list of real branch names like "Babylon Branch", not "LIRR Train")
+                // and the markers all vanish — the bug the user was seeing.
+                //
+                // Build a trip_id → route_id map from the TripUpdate entities first, then
+                // attach it to each vehicle so updateLIRRMarkers can resolve missing
+                // route_ids via the local lookup before falling through to the static
+                // tripToRoute/tripShortNameToRoute fallbacks.
+                // ─────────────────────────────────────────────────────────────────────
+                const tripIdToRouteId = new Map();
+                feed.entity.forEach(entity => {
+                    const tu = entity.tripUpdate || entity.trip_update;
+                    if (!tu || !tu.trip) return;
+                    const tid = tu.trip.tripId || tu.trip.trip_id;
+                    const rid = tu.trip.routeId || tu.trip.route_id;
+                    if (tid && rid) tripIdToRouteId.set(String(tid), String(rid));
+                });
+
                 const vehicles = [];
                 feed.entity.forEach(entity => {
                     if (entity.vehicle && entity.vehicle.position) {
                         vehicles.push(entity.vehicle);
                     }
                 });
-                
-                // Update markers with vehicle data
-                updateLIRRMarkers(vehicles);
-                
+
+                // Hand the lookup table to updateLIRRMarkers so it can fill in the
+                // missing route_id per vehicle before doing its existing matching.
+                updateLIRRMarkers(vehicles, tripIdToRouteId);
+
             } catch (error) {
                 console.error('❌ Error fetching LIRR trains:', error);
                 console.error('Error details:', error.message);
             }
         }
         
-        // Function to update LIRR train markers on the map
-        function updateLIRRMarkers(vehicles) {
+        // Function to update LIRR train markers on the map.
+        // `tripIdToRouteId` (optional) is a Map<trip_id, route_id> built by fetchLIRRTrains
+        // from the TripUpdate entities in the same feed message — used to fill in
+        // route_ids that are missing from VehiclePosition.trip.
+        function updateLIRRMarkers(vehicles, tripIdToRouteId) {
             // Store currently open popups
             const currentLIRRPopups = new Map();
             lirrMarkers.forEach((marker, trainId) => {
@@ -8907,7 +8491,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (!tripRouteId && vehicle.trip[5]) tripRouteId = vehicle.trip[5];
                             } catch (e) { /* ignore */ }
                         }
-                        
+
+                        // Cross-reference: VehiclePosition.trip in the LIRR feed often omits
+                        // route_id; pull it from the matching TripUpdate (built per-poll by
+                        // fetchLIRRTrains). This is what actually resolves most LIRR trains.
+                        if (!tripRouteId && tripId && tripIdToRouteId) {
+                            tripRouteId = tripIdToRouteId.get(String(tripId));
+                        }
+
                         if (tripRouteId && lirrRoutesData && lirrRoutesData.routes) {
                             const tripRouteIdStr = String(tripRouteId);
                             for (const [name, route] of Object.entries(lirrRoutesData.routes)) {
@@ -9182,6 +8773,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // NJ Transit Live Tracking (backend API: getVehicleData via server/; set NJ_TRANSIT_VEHICLES_URL to enable)
         async function fetchNJTransitTrains() {
+            if (!_pageVisible) return;
             if (!NJ_TRANSIT_VEHICLES_URL || NJ_TRANSIT_VEHICLES_URL.trim() === '') {
                 return;
             }
@@ -9216,6 +8808,42 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Port-Jervis-only stop set, cached once. The NJT live API mis-reports Port
+        // Jervis trains as "Main Line" or "Bergen County Line" because they share
+        // track south of Suffern. If NEXT_STOP names a stop that only exists on the
+        // Port Jervis Line, that's authoritative.
+        let _portJervisOnlyStops = null;
+        let _portJervisRouteInfo = null;
+        function getPortJervisOnlyStops() {
+            if (_portJervisOnlyStops !== null) return _portJervisOnlyStops;
+            const rd = njTransitRoutesData;
+            if (!rd || !rd.routes) return new Set();
+            const norm = (s) => String(s || '').trim().toUpperCase();
+            const pj = rd.routes['Port Jervis Line'];
+            if (!pj || !Array.isArray(pj.stops)) {
+                _portJervisOnlyStops = new Set();
+                return _portJervisOnlyStops;
+            }
+            const sharedNames = new Set();
+            for (const [name, route] of Object.entries(rd.routes)) {
+                if (name === 'Port Jervis Line') continue;
+                if (name !== 'Main/Bergen County Line' && name !== 'Bergen County Line' && name !== 'Main Line') continue;
+                for (const stop of (route.stops || [])) sharedNames.add(norm(stop.name));
+            }
+            const exclusive = new Set();
+            for (const stop of pj.stops) {
+                const n = norm(stop.name);
+                if (n && !sharedNames.has(n)) exclusive.add(n);
+            }
+            _portJervisOnlyStops = exclusive;
+            _portJervisRouteInfo = {
+                name: 'Port Jervis Line',
+                route_id: pj.route_id ? String(pj.route_id) : null,
+                color: (pj.color && (pj.color.startsWith('#') ? pj.color : '#' + pj.color)) || null
+            };
+            return _portJervisOnlyStops;
+        }
+
         function updateNJTransitMarkers(vehicles) {
             const currentPopups = new Map();
             njTransitMarkers.forEach((marker, trainId) => {
@@ -9227,11 +8855,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (marker && marker.remove) marker.remove();
             });
             njTransitMarkers.clear();
-            
+
             if (!vehicles || !Array.isArray(vehicles)) return;
             if (typeof njTransitRoutesData === 'undefined' || !njTransitRoutesData || !njTransitRoutesData.routes) return;
-            
+
             const rd = njTransitRoutesData;
+            const portJervisOnlyStops = getPortJervisOnlyStops();
             vehicles.forEach(vehicle => {
                 if (!vehicle.position || vehicle.position.latitude == null || vehicle.position.longitude == null) return;
                 const lat = vehicle.position.latitude;
@@ -9317,6 +8946,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 }
+                // Port Jervis override: if NEXT_STOP is a Port-Jervis-exclusive stop,
+                // the train is a Port Jervis train regardless of TRAIN_LINE.
+                const nextStopName = vehicle.vehicle?.nextStop;
+                if (nextStopName && portJervisOnlyStops.size > 0) {
+                    const ns = String(nextStopName).trim().toUpperCase();
+                    if (portJervisOnlyStops.has(ns) && _portJervisRouteInfo) {
+                        routeName = _portJervisRouteInfo.name;
+                        if (_portJervisRouteInfo.route_id) routeId = _portJervisRouteInfo.route_id;
+                        if (_portJervisRouteInfo.color) color = _portJervisRouteInfo.color;
+                        else color = lineColors[routeName] || color;
+                    }
+                }
+
                 if (routeName === 'NJ Transit Train' && tripId) routeName = `Trip ${tripId}`;
                 
                 let headsign = vehicle.trip?.tripHeadsign || vehicle.trip?.trip_headsign || vehicle.trip?.headsign || (vehicle.vehicle?.nextStop ? `Next: ${vehicle.vehicle.nextStop}` : null) || null;
@@ -9417,6 +9059,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const SEPTA_GTFS_RT_URL = 'https://www3.septa.org/gtfsrt/septarail-pa-us/Vehicle/Vehicle.pb';
         
         async function fetchSEPTATrains() {
+            if (!_pageVisible) return;
             if (!SEPTA_GTFS_RT_URL || SEPTA_GTFS_RT_URL.trim() === '') return;
             try {
                 const now = Date.now();
@@ -9425,7 +9068,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch(SEPTA_GTFS_RT_URL);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const buffer = await response.arrayBuffer();
-                const root = await protobuf.load('./gtfs-realtime.proto');
+                const root = await getGtfsRealtimeProto();
                 const FeedMessage = root.lookupType('transit_realtime.FeedMessage');
                 const feed = FeedMessage.decode(new Uint8Array(buffer));
                 const vehicles = [];
@@ -9629,11 +9272,10 @@ document.addEventListener('DOMContentLoaded', function() {
             amtrakMarkers.clear();
         }
         
-        // NJ Transit live: on Vercel use relative URL; on GitHub Pages use Vercel API; on localhost:8000 use Node server. Set to your Vercel app URL if different.
+        // NJ Transit live: on Vercel use relative URL; on any other origin (GitHub Pages, localhost) use the deployed Vercel API (CORS enabled).
         const NJ_TRANSIT_VERCEL_ORIGIN = 'https://transittracker.vercel.app';
         const NJ_TRANSIT_VEHICLES_URL = (function() {
             if (typeof location === 'undefined') return '/api/nj-transit-vehicles';
-            if (location.hostname === 'localhost' && location.port === '8000') return 'http://localhost:3000/api/nj-transit-vehicles';
             if (location.origin !== NJ_TRANSIT_VERCEL_ORIGIN && NJ_TRANSIT_VERCEL_ORIGIN) return NJ_TRANSIT_VERCEL_ORIGIN + '/api/nj-transit-vehicles';
             return '/api/nj-transit-vehicles';
         })();
@@ -9662,6 +9304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const AMTRAK_API_URL = 'https://corsproxy.io/?url=' + encodeURIComponent(AMTRAK_API_BASE);
         
         async function fetchAmtrakTrains() {
+            if (!_pageVisible) return;
             try {
                 const now = Date.now();
                 if (now - lastAmtrakUpdateTime < 5000) return;
@@ -9815,47 +9458,72 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Load combined stations data first (for multi-system stations with gold markers)
+        loadingProgress.start('combined-stations', 'Fetching multi-system stations');
+        loadingProgress.update('combined-stations', 0.3);
         fetch('data/combined-stations.json')
             .then(response => response.json())
             .then(data => {
                 combinedStationsData = data;
+                loadingProgress.update('combined-stations', 0.8);
                 loadCombinedStations();
+                loadingProgress.finish('combined-stations');
             })
             .catch(error => {
                 console.warn('Could not load combined stations data:', error);
+                loadingProgress.finish('combined-stations');
             });
         
         // Load routes sequentially to avoid conflicts
         // IMPORTANT: Amtrak must load BEFORE Shore Line East (SLE uses Amtrak track geometry)
+        if (window.__perfMark) window.__perfMark('init:before-agency-route-loads');
+
+        // Wrap each agency's load in a progress phase. Most agencies load synchronously in
+        // one shot, so we just bracket the call with start/finish (the bar shows the label
+        // briefly). Amtrak is chunked, so loadAmtrakRoutes manages its own progress reporting.
+        function runAgencyLoad(key, label, fn) {
+            loadingProgress.start(key, label);
+            loadingProgress.update(key, 0.5);
+            fn();
+            loadingProgress.finish(key);
+        }
+
         if (lirrLines.length > 0 && isChecked('show-lirr-paths')) {
-            loadLIRRRoutes(true);
+            runAgencyLoad('lirr-routes', 'Drawing LIRR routes', () => loadLIRRRoutes(true));
+            if (window.__perfMark) window.__perfMark('init:after-loadLIRRRoutes');
         }
-        
+
         if (metroNorthLines.length > 0 && isChecked('show-metro-north-paths')) {
-            loadMetroNorthRoutes(true);
+            runAgencyLoad('metro-north-routes', 'Drawing Metro-North routes', () => loadMetroNorthRoutes(true));
+            if (window.__perfMark) window.__perfMark('init:after-loadMetroNorthRoutes');
         }
-        
+
         if (mtaSubwayLines.length > 0 && isChecked('show-mta-subway-paths')) {
-            loadMTASubwayRoutes(true);
+            runAgencyLoad('mta-subway-routes', 'Drawing MTA Subway routes', () => loadMTASubwayRoutes(true));
+            if (window.__perfMark) window.__perfMark('init:after-loadMTASubwayRoutes');
         }
-        
+
         if (njTransitLines.length > 0 && isChecked('show-nj-transit-paths')) {
-            loadNJTransitRoutes(true);
+            runAgencyLoad('nj-transit-routes', 'Drawing NJ Transit routes', () => loadNJTransitRoutes(true));
+            if (window.__perfMark) window.__perfMark('init:after-loadNJTransitRoutes');
         }
-        
-        // Load Amtrak BEFORE Shore Line East (SLE needs Amtrak track geometry)
+
+        // Load Amtrak BEFORE Shore Line East (SLE needs Amtrak track geometry).
+        // loadAmtrakRoutes handles its own progress (chunked via requestAnimationFrame).
         if (amtrakLines.length > 0 && isChecked('show-amtrak-paths')) {
             loadAmtrakRoutes(true);
+            if (window.__perfMark) window.__perfMark('init:after-loadAmtrakRoutes');
         }
-        
+
         if (shoreLineEastLines.length > 0 && isChecked('show-shore-line-east-paths')) {
-            loadShoreLineEastRoutes(true);
+            runAgencyLoad('shore-line-east-routes', 'Drawing Shore Line East routes', () => loadShoreLineEastRoutes(true));
+            if (window.__perfMark) window.__perfMark('init:after-loadShoreLineEastRoutes');
         }
-        
+
         if (hartfordLineLines.length > 0 && isChecked('show-hartford-line-paths')) {
-            loadHartfordLineRoutes(true);
+            runAgencyLoad('hartford-line-routes', 'Drawing Hartford Line routes', () => loadHartfordLineRoutes(true));
+            if (window.__perfMark) window.__perfMark('init:after-loadHartfordLineRoutes');
         }
-        
+
         // Start live tracking after routes are loaded
         startLiveTracking();
         if (amtrakLines.length > 0 && isChecked('show-amtrak-live')) {
@@ -10013,4 +9681,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 tabsContainer.scrollLeft = scrollLeft - walk;
             });
         }
+
+        if (window.__perfMark) window.__perfMark('app.js:DOMContentLoaded-handler-end');
 }); // End DOMContentLoaded
